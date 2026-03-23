@@ -122,22 +122,7 @@ const Register = () => {
           Employee Registration
         </h2>
         
-        {/* Company Location Banner with Logo Integration
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 rounded-lg mb-6 flex items-center gap-3">
-          <div className="bg-white rounded-full p-2">
-            <span className="text-blue-600 text-xl">📍</span>
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-semibold">Office Location</p>
-            <p className="text-xs">Nxone Tech Tower, Sector 62, Noida</p>
-            <button 
-              onClick={() => setShowLocationDetails(!showLocationDetails)}
-              className="text-xs underline mt-1 hover:text-yellow-300"
-            >
-              {showLocationDetails ? "Hide Details" : "View Location Details"}
-            </button>
-          </div>
-        </div> */}
+        
         
         {showLocationDetails && (
           <div className="bg-blue-800 text-white p-3 rounded-lg mb-4 text-xs border border-blue-400">
@@ -271,11 +256,7 @@ const Register = () => {
         </p>
       </div>
 
-      {/* Footer with company location and logo
-      <div className="flex items-center gap-2 text-white text-xs mt-4 opacity-70">
-        <img src={logo} alt="" className="h-4 w-auto" />
-        <span>© 2024 Nxone Tech Tower • Sector 62, Noida</span>
-      </div> */}
+
     </div>
   );
 };
