@@ -1,6 +1,7 @@
 import axios from "axios";
 
-const API = "https://trackit-copy.onrender.com/api";
+const API = "https://trackit-copy.onrender.com";
+
 // CREATE
 export const addClient = (data) => axios.post(`${API}/add-client`, data);
 

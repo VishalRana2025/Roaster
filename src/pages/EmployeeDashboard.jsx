@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import logo from "../Image/Untitled-design-7-1 (1).webp";
 import axios from "axios";
 
-const API_BASE = "http://localhost:5001";
+const API_BASE = "https://trackit-copy.onrender.com/api";
+const FRONTEND_URL = "https://trackit-copy.vercel.app";
 
 const ClientOnboardingForm = () => {
   const navigate = useNavigate();
@@ -46,10 +47,16 @@ const ClientOnboardingForm = () => {
       navigate("/login");
       return;
     }
-    const user = JSON.parse(userStr);
-    setCurrentUser(user);
-    loadClients();
-  }, []);
+    try {
+      const user = JSON.parse(userStr);
+      setCurrentUser(user);
+      loadClients();
+    } catch (error) {
+      console.error("Error parsing user data:", error);
+      localStorage.removeItem("currentUser");
+      navigate("/login");
+    }
+  }, [navigate]);
 
   // ── Data Layer ─────────────────────────────────────────────────────────────
   const loadClients = async () => {
@@ -57,11 +64,16 @@ const ClientOnboardingForm = () => {
     try {
       const res = await axios.get(`${API_BASE}/clients`);
       setClients(
-        res.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        (res.data || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
       );
     } catch (error) {
       console.error("Error loading clients:", error);
-      alert("Failed to load clients. Please check the server.");
+      if (error.response?.status === 401) {
+        localStorage.removeItem("currentUser");
+        navigate("/login");
+      } else {
+        alert("Failed to load clients. Please check the server.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -71,6 +83,9 @@ const ClientOnboardingForm = () => {
     const res = await axios.post(`${API_BASE}/add-client`, clientData, {
       maxBodyLength: Infinity,
       maxContentLength: Infinity,
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
     return res.data;
   };
@@ -79,6 +94,9 @@ const ClientOnboardingForm = () => {
     const res = await axios.put(`${API_BASE}/update-client/${id}`, clientData, {
       maxBodyLength: Infinity,
       maxContentLength: Infinity,
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
     return res.data;
   };
@@ -88,7 +106,6 @@ const ClientOnboardingForm = () => {
   };
 
   // ── Theme ──────────────────────────────────────────────────────────────────
-
   const toggleTheme = () => {
     setIsDarkMode((prev) => {
       const newTheme = !prev;
@@ -145,7 +162,6 @@ const ClientOnboardingForm = () => {
           let width = img.width;
           let height = img.height;
           
-          // Max dimensions for compression
           const MAX_WIDTH = 1920;
           const MAX_HEIGHT = 1080;
           
@@ -167,7 +183,6 @@ const ClientOnboardingForm = () => {
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
           
-          // Compress image quality (0.7 = 70% quality)
           canvas.toBlob((blob) => {
             const compressedFile = new File([blob], file.name, {
               type: 'image/jpeg',
@@ -196,7 +211,6 @@ const ClientOnboardingForm = () => {
     setIsLoading(true);
     
     for (const file of files) {
-      // Stricter file size limit (3MB for better performance)
       if (file.size > 3 * 1024 * 1024) {
         alert(`File "${file.name}" exceeds the 3 MB limit. Please compress or use a smaller file.`);
         continue;
@@ -205,7 +219,6 @@ const ClientOnboardingForm = () => {
       try {
         let processedFile = file;
         
-        // Compress images to reduce size
         if (file.type.startsWith('image/')) {
           processedFile = await compressImage(file);
           console.log(`Compressed ${file.name}: ${(file.size / 1024 / 1024).toFixed(2)}MB -> ${(processedFile.size / 1024 / 1024).toFixed(2)}MB`);
@@ -279,14 +292,11 @@ const ClientOnboardingForm = () => {
         return;
       }
 
-      // Create a temporary anchor element
       const link = document.createElement('a');
       
-      // For data URLs, we can use them directly
       if (file.data.startsWith('data:')) {
         link.href = file.data;
       } else {
-        // If it's not a data URL, prepend the appropriate MIME type
         const mimeType = file.type || 'application/octet-stream';
         link.href = `data:${mimeType};base64,${file.data}`;
       }
@@ -296,7 +306,6 @@ const ClientOnboardingForm = () => {
       link.click();
       document.body.removeChild(link);
       
-      // Clean up
       setTimeout(() => {
         URL.revokeObjectURL(link.href);
       }, 100);
@@ -342,7 +351,6 @@ const ClientOnboardingForm = () => {
     if (!clientForm.ourPocName?.trim()) { alert("Our POC Name is required."); return false; }
     if (!clientForm.startDate) { alert("Start Date is required."); return false; }
     
-    // Check total attachments size
     const totalSize = attachments.reduce((sum, file) => sum + file.size, 0);
     if (totalSize > 10 * 1024 * 1024) {
       alert("Total attachments size exceeds 10 MB. Please remove some files.");
@@ -392,6 +400,9 @@ const ClientOnboardingForm = () => {
       console.error("Error saving client:", error);
       if (error.response?.status === 413) {
         alert("File size too large. Please compress images or use smaller files (max 3MB per file, 10MB total).");
+      } else if (error.response?.status === 401) {
+        localStorage.removeItem("currentUser");
+        navigate("/login");
       } else {
         alert("Failed to save client. Please try again.");
       }
@@ -427,7 +438,12 @@ const ClientOnboardingForm = () => {
       alert("Client deleted successfully!");
     } catch (error) {
       console.error("Error deleting client:", error);
-      alert("Failed to delete client. Please try again.");
+      if (error.response?.status === 401) {
+        localStorage.removeItem("currentUser");
+        navigate("/login");
+      } else {
+        alert("Failed to delete client. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -446,13 +462,17 @@ const ClientOnboardingForm = () => {
 
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    try {
+      return new Date(dateString).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return "Invalid Date";
+    }
   };
 
   const logout = () => {
@@ -1032,7 +1052,7 @@ const ClientOnboardingForm = () => {
                         <th className="p-3 text-left">Attachments</th>
                         <th className="p-3 text-left">Added On</th>
                         <th className="p-3 text-left">Actions</th>
-                      </tr>
+                       </tr>
                     </thead>
                     <tbody>
                       {filteredClients.map((client, index) => (

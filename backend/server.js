@@ -1,6 +1,8 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+require("dotenv").config();
+
 const Client = require("./models/Client");
 
 const app = express();
@@ -9,13 +11,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// MongoDB connection
-mongoose.connect("mongodb://127.0.0.1:27017/trackitDB", {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-.then(() => console.log("✅ MongoDB Connected"))
-.catch(err => console.log("❌ DB Error:", err));
+// ✅ MongoDB connection (use ENV variable)
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log("✅ MongoDB Connected"))
+  .catch(err => console.log("❌ DB Error:", err));
 
 // test route
 app.get("/", (req, res) => {
@@ -25,7 +24,7 @@ app.get("/", (req, res) => {
 // ================== API ROUTES ==================
 
 // ✅ CREATE
-app.post("/add-client", async (req, res) => {
+app.post("/api/add-client", async (req, res) => {
   try {
     const client = new Client(req.body);
     await client.save();
@@ -37,7 +36,7 @@ app.post("/add-client", async (req, res) => {
 });
 
 // ✅ GET ALL
-app.get("/clients", async (req, res) => {
+app.get("/api/clients", async (req, res) => {
   try {
     const clients = await Client.find().sort({ createdAt: -1 });
     res.json(clients);
@@ -48,7 +47,7 @@ app.get("/clients", async (req, res) => {
 });
 
 // ✅ UPDATE
-app.put("/update-client/:id", async (req, res) => {
+app.put("/api/update-client/:id", async (req, res) => {
   try {
     const updated = await Client.findByIdAndUpdate(
       req.params.id,
@@ -62,7 +61,7 @@ app.put("/update-client/:id", async (req, res) => {
 });
 
 // ✅ DELETE
-app.delete("/delete-client/:id", async (req, res) => {
+app.delete("/api/delete-client/:id", async (req, res) => {
   try {
     await Client.findByIdAndDelete(req.params.id);
     res.json({ message: "Client deleted" });
@@ -72,7 +71,9 @@ app.delete("/delete-client/:id", async (req, res) => {
 });
 
 // ================== START SERVER ==================
-const PORT = 5001; // 🔥 changed port (fix for EADDRINUSE)
+
+// ✅ IMPORTANT for Render
+const PORT = process.env.PORT || 5001;
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
