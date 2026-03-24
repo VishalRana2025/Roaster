@@ -41,6 +41,7 @@ const ClientOnboardingForm = () => {
 
   const [clientForm, setClientForm] = useState(defaultForm);
 
+  // ── FIXED: Pass user directly to avoid async state issue ──────────────────
   useEffect(() => {
     const userStr = localStorage.getItem("currentUser");
     if (!userStr) {
@@ -50,7 +51,8 @@ const ClientOnboardingForm = () => {
     try {
       const user = JSON.parse(userStr);
       setCurrentUser(user);
-      loadClients();
+      // ✅ Pass user directly — don't rely on currentUser state which hasn't updated yet
+      loadClients(user);
     } catch (error) {
       console.error("Error parsing user data:", error);
       localStorage.removeItem("currentUser");
@@ -59,12 +61,32 @@ const ClientOnboardingForm = () => {
   }, [navigate]);
 
   // ── Data Layer ─────────────────────────────────────────────────────────────
-  const loadClients = async () => {
+  // ✅ FIXED: Accept user as parameter so filtering always works correctly
+  const loadClients = async (user) => {
+    // Use passed user param first, fallback to state (for manual refreshes)
+    const activeUser = user || currentUser;
+
+    if (!activeUser) {
+      console.warn("loadClients called with no user — skipping");
+      return;
+    }
+
     setIsLoading(true);
     try {
       const res = await axios.get(`${API_BASE}/clients`);
+
+      // ✅ Filter strictly by BOTH id AND email so no cross-account leakage
+      const userClients = (res.data || []).filter((client) => {
+        const matchById = activeUser.id && client.createdBy === activeUser.id;
+        const matchByEmail =
+          activeUser.email &&
+          client.createdByEmail &&
+          client.createdByEmail.toLowerCase() === activeUser.email.toLowerCase();
+        return matchById || matchByEmail;
+      });
+
       setClients(
-        (res.data || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        userClients.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
       );
     } catch (error) {
       console.error("Error loading clients:", error);
@@ -80,12 +102,16 @@ const ClientOnboardingForm = () => {
   };
 
   const createClient = async (clientData) => {
-    const res = await axios.post(`${API_BASE}/add-client`, clientData, {
+    const dataWithUser = {
+      ...clientData,
+      createdBy: currentUser.id,
+      createdByEmail: currentUser.email,
+      createdByName: `${currentUser.firstName} ${currentUser.lastName}`,
+    };
+    const res = await axios.post(`${API_BASE}/add-client`, dataWithUser, {
       maxBodyLength: Infinity,
       maxContentLength: Infinity,
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { "Content-Type": "application/json" },
     });
     return res.data;
   };
@@ -94,9 +120,7 @@ const ClientOnboardingForm = () => {
     const res = await axios.put(`${API_BASE}/update-client/${id}`, clientData, {
       maxBodyLength: Infinity,
       maxContentLength: Infinity,
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { "Content-Type": "application/json" },
     });
     return res.data;
   };
@@ -143,55 +167,37 @@ const ClientOnboardingForm = () => {
       : "bg-red-500 hover:bg-red-600",
   };
 
-  // ── File Compression Function ─────────────────────────────────────────────
+  // ── File Compression ───────────────────────────────────────────────────────
   const compressImage = (file) => {
     return new Promise((resolve, reject) => {
-      if (!file.type.startsWith('image/')) {
+      if (!file.type.startsWith("image/")) {
         resolve(file);
         return;
       }
-
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = (event) => {
         const img = new Image();
         img.src = event.target.result;
-        
         img.onload = () => {
-          const canvas = document.createElement('canvas');
+          const canvas = document.createElement("canvas");
           let width = img.width;
           let height = img.height;
-          
           const MAX_WIDTH = 1920;
           const MAX_HEIGHT = 1080;
-          
           if (width > height) {
-            if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
-              width = MAX_WIDTH;
-            }
+            if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
           } else {
-            if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
-              height = MAX_HEIGHT;
-            }
+            if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
           }
-          
           canvas.width = width;
           canvas.height = height;
-          
-          const ctx = canvas.getContext('2d');
+          const ctx = canvas.getContext("2d");
           ctx.drawImage(img, 0, 0, width, height);
-          
           canvas.toBlob((blob) => {
-            const compressedFile = new File([blob], file.name, {
-              type: 'image/jpeg',
-              lastModified: Date.now(),
-            });
-            resolve(compressedFile);
-          }, 'image/jpeg', 0.7);
+            resolve(new File([blob], file.name, { type: "image/jpeg", lastModified: Date.now() }));
+          }, "image/jpeg", 0.7);
         };
-        
         img.onerror = reject;
       };
       reader.onerror = reject;
@@ -207,38 +213,24 @@ const ClientOnboardingForm = () => {
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
-
     setIsLoading(true);
-    
     for (const file of files) {
       if (file.size > 3 * 1024 * 1024) {
-        alert(`File "${file.name}" exceeds the 3 MB limit. Please compress or use a smaller file.`);
+        alert(`File "${file.name}" exceeds the 3 MB limit.`);
         continue;
       }
-
       try {
         let processedFile = file;
-        
-        if (file.type.startsWith('image/')) {
+        if (file.type.startsWith("image/")) {
           processedFile = await compressImage(file);
-          console.log(`Compressed ${file.name}: ${(file.size / 1024 / 1024).toFixed(2)}MB -> ${(processedFile.size / 1024 / 1024).toFixed(2)}MB`);
         }
-        
         const fileId = `${Date.now()}-${Math.random().toString(36).slice(2)}-${processedFile.name}`;
-        
         setUploadProgress((prev) => ({ ...prev, [fileId]: 0 }));
-        
         const reader = new FileReader();
-        
         reader.onerror = () => {
-          alert(`Failed to read file "${processedFile.name}". Please try again.`);
-          setUploadProgress((prev) => {
-            const updated = { ...prev };
-            delete updated[fileId];
-            return updated;
-          });
+          alert(`Failed to read file "${processedFile.name}".`);
+          setUploadProgress((prev) => { const u = { ...prev }; delete u[fileId]; return u; });
         };
-        
         reader.onload = (event) => {
           const fileData = {
             id: fileId,
@@ -248,30 +240,22 @@ const ClientOnboardingForm = () => {
             data: event.target.result,
             uploadedAt: new Date().toISOString(),
           };
-          
           setAttachments((prev) => {
             const updated = [...prev, fileData];
             setClientForm((prevForm) => ({ ...prevForm, attachments: updated }));
             return updated;
           });
-          
           setUploadProgress((prev) => ({ ...prev, [fileId]: 100 }));
           setTimeout(() => {
-            setUploadProgress((prev) => {
-              const updated = { ...prev };
-              delete updated[fileId];
-              return updated;
-            });
+            setUploadProgress((prev) => { const u = { ...prev }; delete u[fileId]; return u; });
           }, 1000);
         };
-        
         reader.readAsDataURL(processedFile);
       } catch (error) {
-        console.error('Error processing file:', error);
-        alert(`Failed to process file "${file.name}". Please try again.`);
+        console.error("Error processing file:", error);
+        alert(`Failed to process file "${file.name}".`);
       }
     }
-    
     setIsLoading(false);
     e.target.value = "";
   };
@@ -284,39 +268,24 @@ const ClientOnboardingForm = () => {
     }));
   };
 
-  // ── Enhanced File Download Function ──────────────────────────────────────
   const downloadFile = (file) => {
     try {
-      if (!file.data) {
-        alert("File data not available for download");
-        return;
-      }
-
-      const link = document.createElement('a');
-      
-      if (file.data.startsWith('data:')) {
-        link.href = file.data;
-      } else {
-        const mimeType = file.type || 'application/octet-stream';
-        link.href = `data:${mimeType};base64,${file.data}`;
-      }
-      
+      if (!file.data) { alert("File data not available."); return; }
+      const link = document.createElement("a");
+      link.href = file.data.startsWith("data:")
+        ? file.data
+        : `data:${file.type || "application/octet-stream"};base64,${file.data}`;
       link.download = file.name;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
-      setTimeout(() => {
-        URL.revokeObjectURL(link.href);
-      }, 100);
-      
+      setTimeout(() => URL.revokeObjectURL(link.href), 100);
     } catch (error) {
       console.error("Error downloading file:", error);
-      alert("Failed to download file. Please try again.");
+      alert("Failed to download file.");
     }
   };
 
-  // ── View Attachments Modal ─────────────────────────────────────────────────
   const viewAttachments = (client) => {
     setSelectedClientForAttachments(client);
     setShowAttachmentsModal(true);
@@ -341,22 +310,17 @@ const ClientOnboardingForm = () => {
     if (!clientForm.clientName?.trim()) { alert("Client Name is required."); return false; }
     if (!clientForm.clientPocName?.trim()) { alert("Client POC Name is required."); return false; }
     if (!clientForm.clientPocEmail?.trim()) { alert("Client POC Email is required."); return false; }
-    if (!emailRegex.test(clientForm.clientPocEmail)) { alert("Please enter a valid Client POC email address."); return false; }
+    if (!emailRegex.test(clientForm.clientPocEmail)) { alert("Please enter a valid Client POC email."); return false; }
     if (!clientForm.clientPocMobile?.trim()) { alert("Client POC Mobile Number is required."); return false; }
     const mobileDigits = clientForm.clientPocMobile.replace(/\D/g, "");
     if (mobileDigits.length !== 10) { alert("Please enter a valid 10-digit mobile number."); return false; }
     if (clientForm.clientVanderEmail && !emailRegex.test(clientForm.clientVanderEmail)) {
-      alert("Please enter a valid Vendor email address."); return false;
+      alert("Please enter a valid Vendor email."); return false;
     }
     if (!clientForm.ourPocName?.trim()) { alert("Our POC Name is required."); return false; }
     if (!clientForm.startDate) { alert("Start Date is required."); return false; }
-    
     const totalSize = attachments.reduce((sum, file) => sum + file.size, 0);
-    if (totalSize > 10 * 1024 * 1024) {
-      alert("Total attachments size exceeds 10 MB. Please remove some files.");
-      return false;
-    }
-    
+    if (totalSize > 10 * 1024 * 1024) { alert("Total attachments exceed 10 MB."); return false; }
     return true;
   };
 
@@ -374,6 +338,8 @@ const ClientOnboardingForm = () => {
       clientPocMobile: formattedMobile,
       attachments,
       createdBy: currentUser.id,
+      createdByEmail: currentUser.email,
+      createdByName: `${currentUser.firstName} ${currentUser.lastName}`,
       updatedAt: now,
       ...(selectedClient ? { createdAt: selectedClient.createdAt } : { createdAt: now }),
     };
@@ -392,14 +358,15 @@ const ClientOnboardingForm = () => {
         resetForm();
       } else {
         await createClient(clientData);
-        await loadClients();
+        // ✅ Pass currentUser directly to ensure fresh filter after save
+        await loadClients(currentUser);
         alert("Client onboarded successfully!");
         resetForm();
       }
     } catch (error) {
       console.error("Error saving client:", error);
       if (error.response?.status === 413) {
-        alert("File size too large. Please compress images or use smaller files (max 3MB per file, 10MB total).");
+        alert("File size too large. Max 3MB per file, 10MB total.");
       } else if (error.response?.status === 401) {
         localStorage.removeItem("currentUser");
         navigate("/login");
@@ -464,15 +431,10 @@ const ClientOnboardingForm = () => {
     if (!dateString) return "N/A";
     try {
       return new Date(dateString).toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
+        day: "2-digit", month: "2-digit", year: "numeric",
+        hour: "2-digit", minute: "2-digit",
       });
-    } catch {
-      return "Invalid Date";
-    }
+    } catch { return "Invalid Date"; }
   };
 
   const logout = () => {
@@ -547,89 +509,44 @@ const ClientOnboardingForm = () => {
                   {selectedClientForAttachments.attachments?.length || 0} file(s) attached
                 </p>
               </div>
-              <button
-                onClick={() => setShowAttachmentsModal(false)}
-                className="text-gray-500 hover:text-gray-700 text-2xl"
-              >
-                ×
-              </button>
+              <button onClick={() => setShowAttachmentsModal(false)} className="text-gray-500 hover:text-gray-700 text-2xl">×</button>
             </div>
-            
             {selectedClientForAttachments.attachments?.length > 0 ? (
               <div className="space-y-3">
                 {selectedClientForAttachments.attachments.map((file, index) => (
-                  <div
-                    key={file.id || index}
-                    className={`flex items-center justify-between p-4 ${themeStyles.border} border rounded-lg hover:shadow-md transition-all hover:scale-[1.02]`}
-                  >
+                  <div key={file.id || index} className={`flex items-center justify-between p-4 ${themeStyles.border} border rounded-lg hover:shadow-md transition-all hover:scale-[1.02]`}>
                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <span className="text-3xl">
-                        {getFileIcon(file.type)}
-                      </span>
+                      <span className="text-3xl">{getFileIcon(file.type)}</span>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{file.name}</p>
                         <div className="flex flex-wrap gap-3 mt-1">
-                          <p className={`text-xs ${themeStyles.secondaryText}`}>
-                            {formatFileSize(file.size)}
-                          </p>
-                          <p className={`text-xs ${themeStyles.secondaryText}`}>
-                            Uploaded {formatDate(file.uploadedAt)}
-                          </p>
+                          <p className={`text-xs ${themeStyles.secondaryText}`}>{formatFileSize(file.size)}</p>
+                          <p className={`text-xs ${themeStyles.secondaryText}`}>Uploaded {formatDate(file.uploadedAt)}</p>
                           {file.type && (
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
-                              {file.type.split('/')[1]?.toUpperCase() || 'FILE'}
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`}>
+                              {file.type.split("/")[1]?.toUpperCase() || "FILE"}
                             </span>
                           )}
                         </div>
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <button
-                        onClick={() => downloadFile(file)}
-                        className={`px-4 py-2 rounded-lg text-white ${themeStyles.button} flex items-center gap-2 transition-colors hover:scale-105`}
-                        title="Download"
-                      >
-                        <span>📥</span>
-                        <span className="hidden sm:inline">Download</span>
+                      <button onClick={() => downloadFile(file)} className={`px-4 py-2 rounded-lg text-white ${themeStyles.button} flex items-center gap-2`} title="Download">
+                        <span>📥</span><span className="hidden sm:inline">Download</span>
                       </button>
-                      {file.type?.includes('image') && (
+                      {file.type?.includes("image") && (
                         <button
                           onClick={() => {
-                            const imageWindow = window.open();
-                            if (imageWindow && file.data) {
-                              imageWindow.document.write(`
-                                <html>
-                                  <head>
-                                    <title>${file.name}</title>
-                                    <style>
-                                      body {
-                                        margin: 0;
-                                        display: flex;
-                                        justify-content: center;
-                                        align-items: center;
-                                        min-height: 100vh;
-                                        background: #1a1a1a;
-                                      }
-                                      img {
-                                        max-width: 100%;
-                                        max-height: 100vh;
-                                        object-fit: contain;
-                                      }
-                                    </style>
-                                  </head>
-                                  <body>
-                                    <img src="${file.data}" alt="${file.name}" />
-                                  </body>
-                                </html>
-                              `);
-                              imageWindow.document.close();
+                            const w = window.open();
+                            if (w && file.data) {
+                              w.document.write(`<html><head><title>${file.name}</title><style>body{margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#1a1a1a;}img{max-width:100%;max-height:100vh;object-fit:contain;}</style></head><body><img src="${file.data}" alt="${file.name}"/></body></html>`);
+                              w.document.close();
                             }
                           }}
-                          className={`px-4 py-2 rounded-lg text-white ${themeStyles.buttonSecondary} flex items-center gap-2 transition-colors hover:scale-105`}
+                          className={`px-4 py-2 rounded-lg text-white ${themeStyles.buttonSecondary} flex items-center gap-2`}
                           title="Preview"
                         >
-                          <span>👁️</span>
-                          <span className="hidden sm:inline">Preview</span>
+                          <span>👁️</span><span className="hidden sm:inline">Preview</span>
                         </button>
                       )}
                     </div>
@@ -640,9 +557,6 @@ const ClientOnboardingForm = () => {
               <div className="text-center py-8">
                 <span className="text-5xl mb-4 block opacity-50">📂</span>
                 <p className={`text-lg ${themeStyles.secondaryText}`}>No attachments found</p>
-                <p className={`text-sm ${themeStyles.secondaryText} mt-2`}>
-                  This client has no uploaded files
-                </p>
               </div>
             )}
           </div>
@@ -655,27 +569,16 @@ const ClientOnboardingForm = () => {
           <img src={logo} alt="Company Logo" className="h-12 w-auto mx-auto mb-3 bg-white p-1 rounded-lg" />
           <h1 className="text-xl font-bold text-yellow-400">Client Onboarding</h1>
           <p className="text-sm text-gray-400 mt-1">{currentUser.employeeId}</p>
+          <p className="text-xs text-gray-500 mt-1">{currentUser.email}</p>
         </div>
-
         <ul className="mt-4 flex-1">
-          <li
-            onClick={() => setActivePage("onboarding")}
-            className={`px-6 py-3 cursor-pointer transition-colors flex items-center gap-2 ${
-              activePage === "onboarding" ? "bg-blue-600" : "hover:bg-blue-500"
-            }`}
-          >
+          <li onClick={() => setActivePage("onboarding")} className={`px-6 py-3 cursor-pointer transition-colors flex items-center gap-2 ${activePage === "onboarding" ? "bg-blue-600" : "hover:bg-blue-500"}`}>
             <span>📝</span> New Client
           </li>
-          <li
-            onClick={() => setActivePage("clients")}
-            className={`px-6 py-3 cursor-pointer transition-colors flex items-center gap-2 ${
-              activePage === "clients" ? "bg-blue-600" : "hover:bg-blue-500"
-            }`}
-          >
+          <li onClick={() => setActivePage("clients")} className={`px-6 py-3 cursor-pointer transition-colors flex items-center gap-2 ${activePage === "clients" ? "bg-blue-600" : "hover:bg-blue-500"}`}>
             <span>👥</span> Client List
           </li>
         </ul>
-
         <div className="p-4 text-xs text-gray-400 border-t border-gray-700">
           <div className="mb-2">
             <p className="font-medium text-gray-300">Total Clients</p>
@@ -700,21 +603,15 @@ const ClientOnboardingForm = () => {
             </h1>
           </div>
           <div className="flex items-center gap-4">
-            <button
-              onClick={toggleTheme}
-              className="bg-gray-700 px-3 py-1 rounded hover:bg-gray-600 transition-colors"
-            >
+            <div className="text-sm hidden md:block">
+              <span>Welcome, {currentUser.firstName} {currentUser.lastName}</span>
+            </div>
+            <button onClick={toggleTheme} className="bg-gray-700 px-3 py-1 rounded hover:bg-gray-600 transition-colors">
               {isDarkMode ? "☀️" : "🌙"}
             </button>
-            <span className="text-sm hidden md:block">
-              {new Date().toLocaleDateString("en-IN")}
-            </span>
-            <button
-              onClick={logout}
-              className="bg-red-500 px-4 py-1 rounded hover:bg-red-600 transition-colors flex items-center gap-2"
-            >
-              <span>🚪</span>
-              <span className="hidden md:inline">Logout</span>
+            <span className="text-sm hidden md:block">{new Date().toLocaleDateString("en-IN")}</span>
+            <button onClick={logout} className="bg-red-500 px-4 py-1 rounded hover:bg-red-600 transition-colors flex items-center gap-2">
+              <span>🚪</span><span className="hidden md:inline">Logout</span>
             </button>
           </div>
         </div>
@@ -727,150 +624,74 @@ const ClientOnboardingForm = () => {
               <div className={`${themeStyles.card} p-6 rounded-lg shadow-lg mb-6`}>
                 <div className="flex justify-between items-center mb-6">
                   <div>
-                    <h2 className="text-2xl font-bold">
-                      {selectedClient ? "Edit Client" : "Onboard New Client"}
-                    </h2>
-                    <p className={`text-sm ${themeStyles.secondaryText} mt-1`}>
-                      Fill in the client details below
-                    </p>
+                    <h2 className="text-2xl font-bold">{selectedClient ? "Edit Client" : "Onboard New Client"}</h2>
+                    <p className={`text-sm ${themeStyles.secondaryText} mt-1`}>Fill in the client details below</p>
                   </div>
                   {selectedClient && (
-                    <button
-                      onClick={resetForm}
-                      className={`px-4 py-2 rounded text-white ${themeStyles.buttonSecondary} transition-colors`}
-                    >
+                    <button onClick={resetForm} className={`px-4 py-2 rounded text-white ${themeStyles.buttonSecondary} transition-colors`}>
                       New Client
                     </button>
                   )}
                 </div>
 
                 <div className="space-y-6">
-                  {/* Client Name */}
                   <div>
-                    <label className="block mb-2 font-medium">
-                      Client Name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="clientName"
-                      value={clientForm.clientName}
-                      onChange={handleInputChange}
+                    <label className="block mb-2 font-medium">Client Name <span className="text-red-500">*</span></label>
+                    <input type="text" name="clientName" value={clientForm.clientName} onChange={handleInputChange}
                       className={`${themeStyles.input} border p-3 w-full rounded-lg focus:ring-2 focus:ring-blue-500 outline-none`}
-                      placeholder="Enter client company name"
-                      autoComplete="off"
-                    />
+                      placeholder="Enter client company name" autoComplete="off" />
                   </div>
 
-                  {/* Client POC Name & Email */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block mb-2 font-medium">
-                        Client POC Name <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="clientPocName"
-                        value={clientForm.clientPocName}
-                        onChange={handleInputChange}
+                      <label className="block mb-2 font-medium">Client POC Name <span className="text-red-500">*</span></label>
+                      <input type="text" name="clientPocName" value={clientForm.clientPocName} onChange={handleInputChange}
                         className={`${themeStyles.input} border p-3 w-full rounded-lg focus:ring-2 focus:ring-blue-500 outline-none`}
-                        placeholder="Enter client point of contact name"
-                        autoComplete="off"
-                      />
+                        placeholder="Enter client point of contact name" autoComplete="off" />
                     </div>
                     <div>
-                      <label className="block mb-2 font-medium">
-                        Client POC Email <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="email"
-                        name="clientPocEmail"
-                        value={clientForm.clientPocEmail}
-                        onChange={handleInputChange}
+                      <label className="block mb-2 font-medium">Client POC Email <span className="text-red-500">*</span></label>
+                      <input type="email" name="clientPocEmail" value={clientForm.clientPocEmail} onChange={handleInputChange}
                         className={`${themeStyles.input} border p-3 w-full rounded-lg focus:ring-2 focus:ring-blue-500 outline-none`}
-                        placeholder="Enter client POC email"
-                        autoComplete="off"
-                      />
+                        placeholder="Enter client POC email" autoComplete="off" />
                     </div>
                   </div>
 
-                  {/* Mobile & Vendor Email */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block mb-2 font-medium">
-                        Client POC Mobile Number <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="tel"
-                        name="clientPocMobile"
-                        value={clientForm.clientPocMobile}
-                        onChange={handleInputChange}
+                      <label className="block mb-2 font-medium">Client POC Mobile Number <span className="text-red-500">*</span></label>
+                      <input type="tel" name="clientPocMobile" value={clientForm.clientPocMobile} onChange={handleInputChange}
                         className={`${themeStyles.input} border p-3 w-full rounded-lg focus:ring-2 focus:ring-blue-500 outline-none`}
-                        placeholder="Enter 10-digit mobile number"
-                        maxLength="10"
-                        autoComplete="off"
-                      />
-                      <p className={`text-xs ${themeStyles.secondaryText} mt-1`}>
-                        Enter 10-digit mobile number
-                      </p>
+                        placeholder="Enter 10-digit mobile number" maxLength="10" autoComplete="off" />
+                      <p className={`text-xs ${themeStyles.secondaryText} mt-1`}>Enter 10-digit mobile number</p>
                     </div>
                     <div>
                       <label className="block mb-2 font-medium">Client Vendor Email</label>
-                      <input
-                        type="email"
-                        name="clientVanderEmail"
-                        value={clientForm.clientVanderEmail}
-                        onChange={handleInputChange}
+                      <input type="email" name="clientVanderEmail" value={clientForm.clientVanderEmail} onChange={handleInputChange}
                         className={`${themeStyles.input} border p-3 w-full rounded-lg focus:ring-2 focus:ring-blue-500 outline-none`}
-                        placeholder="Enter client vendor email"
-                        autoComplete="off"
-                      />
-                      <p className={`text-xs ${themeStyles.secondaryText} mt-1`}>
-                        Optional: vendor email for billing
-                      </p>
+                        placeholder="Enter client vendor email" autoComplete="off" />
+                      <p className={`text-xs ${themeStyles.secondaryText} mt-1`}>Optional: vendor email for billing</p>
                     </div>
                   </div>
 
-                  {/* Our POC Name & Start Date */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block mb-2 font-medium">
-                        Our POC Name <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="ourPocName"
-                        value={clientForm.ourPocName}
-                        onChange={handleInputChange}
+                      <label className="block mb-2 font-medium">Our POC Name <span className="text-red-500">*</span></label>
+                      <input type="text" name="ourPocName" value={clientForm.ourPocName} onChange={handleInputChange}
                         className={`${themeStyles.input} border p-3 w-full rounded-lg focus:ring-2 focus:ring-blue-500 outline-none`}
-                        placeholder="Enter our point of contact name"
-                        autoComplete="off"
-                      />
+                        placeholder="Enter our point of contact name" autoComplete="off" />
                     </div>
                     <div>
-                      <label className="block mb-2 font-medium">
-                        Start Date <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        name="startDate"
-                        value={clientForm.startDate}
-                        onChange={handleInputChange}
-                        className={`${themeStyles.input} border p-3 w-full rounded-lg focus:ring-2 focus:ring-blue-500 outline-none`}
-                      />
+                      <label className="block mb-2 font-medium">Start Date <span className="text-red-500">*</span></label>
+                      <input type="date" name="startDate" value={clientForm.startDate} onChange={handleInputChange}
+                        className={`${themeStyles.input} border p-3 w-full rounded-lg focus:ring-2 focus:ring-blue-500 outline-none`} />
                     </div>
                   </div>
 
-                  {/* Payment Terms */}
                   <div>
-                    <label className="block mb-2 font-medium">
-                      Payment Terms <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      name="paymentTerms"
-                      value={clientForm.paymentTerms}
-                      onChange={handleInputChange}
-                      className={`${themeStyles.input} border p-3 w-full rounded-lg focus:ring-2 focus:ring-blue-500 outline-none`}
-                    >
+                    <label className="block mb-2 font-medium">Payment Terms <span className="text-red-500">*</span></label>
+                    <select name="paymentTerms" value={clientForm.paymentTerms} onChange={handleInputChange}
+                      className={`${themeStyles.input} border p-3 w-full rounded-lg focus:ring-2 focus:ring-blue-500 outline-none`}>
                       <option value="15">15 Days</option>
                       <option value="30">30 Days</option>
                       <option value="45">45 Days</option>
@@ -883,25 +704,15 @@ const ClientOnboardingForm = () => {
                   {/* Attachments */}
                   <div className="border-t pt-6">
                     <label className="block mb-4 font-medium text-lg">📎 Attachments (Max 3MB per file, 10MB total)</label>
-                    <input
-                      id="file-upload"
-                      type="file"
-                      multiple
-                      onChange={handleFileUpload}
-                      className="hidden"
-                      accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.bmp,.txt"
-                    />
+                    <input id="file-upload" type="file" multiple onChange={handleFileUpload} className="hidden"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.bmp,.txt" />
                     <div
                       className={`border-2 border-dashed ${themeStyles.border} rounded-lg p-6 text-center hover:border-blue-500 transition-colors cursor-pointer`}
                       onClick={() => document.getElementById("file-upload").click()}
                     >
-                      <div className="space-y-2">
-                        <span className="text-4xl block">📁</span>
-                        <p className="font-medium">Click to upload or drag and drop</p>
-                        <p className={`text-sm ${themeStyles.secondaryText}`}>
-                          Supported: PDF, DOC, DOCX, XLS, XLSX, Images (JPG, PNG, GIF, BMP), TXT (max 3 MB each)
-                        </p>
-                      </div>
+                      <span className="text-4xl block">📁</span>
+                      <p className="font-medium">Click to upload or drag and drop</p>
+                      <p className={`text-sm ${themeStyles.secondaryText}`}>PDF, DOC, DOCX, XLS, XLSX, Images, TXT (max 3 MB each)</p>
                     </div>
 
                     {Object.keys(uploadProgress).length > 0 && (
@@ -909,10 +720,7 @@ const ClientOnboardingForm = () => {
                         {Object.entries(uploadProgress).map(([fileId, progress]) => (
                           <div key={fileId} className="flex items-center gap-2">
                             <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-blue-500 transition-all duration-300"
-                                style={{ width: `${progress}%` }}
-                              />
+                              <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${progress}%` }} />
                             </div>
                             <span className="text-xs">{progress}%</span>
                           </div>
@@ -924,36 +732,17 @@ const ClientOnboardingForm = () => {
                       <div className="mt-4 space-y-2">
                         <h4 className="font-medium mb-2">Uploaded Files:</h4>
                         {attachments.map((file) => (
-                          <div
-                            key={file.id}
-                            className={`flex items-center justify-between p-3 ${themeStyles.border} border rounded-lg`}
-                          >
+                          <div key={file.id} className={`flex items-center justify-between p-3 ${themeStyles.border} border rounded-lg`}>
                             <div className="flex items-center gap-3 flex-1 min-w-0">
-                              <span className="text-2xl">
-                                {getFileIcon(file.type)}
-                              </span>
+                              <span className="text-2xl">{getFileIcon(file.type)}</span>
                               <div className="flex-1 min-w-0">
                                 <p className="font-medium truncate">{file.name}</p>
-                                <p className={`text-xs ${themeStyles.secondaryText}`}>
-                                  {formatFileSize(file.size)} • Uploaded {formatDate(file.uploadedAt)}
-                                </p>
+                                <p className={`text-xs ${themeStyles.secondaryText}`}>{formatFileSize(file.size)} • Uploaded {formatDate(file.uploadedAt)}</p>
                               </div>
                             </div>
                             <div className="flex gap-2">
-                              <button
-                                onClick={() => downloadFile(file)}
-                                className="p-2 text-blue-500 hover:bg-blue-100 rounded-lg transition-colors"
-                                title="Download"
-                              >
-                                📥
-                              </button>
-                              <button
-                                onClick={() => removeAttachment(file.id)}
-                                className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors"
-                                title="Remove"
-                              >
-                                🗑️
-                              </button>
+                              <button onClick={() => downloadFile(file)} className="p-2 text-blue-500 hover:bg-blue-100 rounded-lg transition-colors" title="Download">📥</button>
+                              <button onClick={() => removeAttachment(file.id)} className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors" title="Remove">🗑️</button>
                             </div>
                           </div>
                         ))}
@@ -961,22 +750,15 @@ const ClientOnboardingForm = () => {
                     )}
                   </div>
 
-                  {/* Action Buttons */}
                   <div className="flex gap-3 pt-4 border-t">
-                    <button
-                      onClick={saveClient}
-                      disabled={isLoading}
-                      className={`px-6 py-3 rounded-lg text-white ${themeStyles.buttonSuccess} transition-colors flex items-center gap-2 flex-1 justify-center font-medium disabled:opacity-60`}
-                    >
+                    <button onClick={saveClient} disabled={isLoading}
+                      className={`px-6 py-3 rounded-lg text-white ${themeStyles.buttonSuccess} transition-colors flex items-center gap-2 flex-1 justify-center font-medium disabled:opacity-60`}>
                       <span>💾</span>
                       {isLoading ? "Saving…" : selectedClient ? "Update Client" : "Save Client"}
                     </button>
                     {selectedClient && (
-                      <button
-                        onClick={resetForm}
-                        disabled={isLoading}
-                        className={`px-6 py-3 rounded-lg text-white ${themeStyles.buttonSecondary} transition-colors flex items-center gap-2 justify-center font-medium disabled:opacity-60`}
-                      >
+                      <button onClick={resetForm} disabled={isLoading}
+                        className={`px-6 py-3 rounded-lg text-white ${themeStyles.buttonSecondary} transition-colors flex items-center gap-2 justify-center font-medium disabled:opacity-60`}>
                         <span>🔄</span> Cancel
                       </button>
                     )}
@@ -992,23 +774,16 @@ const ClientOnboardingForm = () => {
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                 <div className="flex items-center gap-2">
                   <span className="text-2xl">👥</span>
-                  <h2 className="text-xl font-semibold">Client List</h2>
+                  <h2 className="text-xl font-semibold">My Clients</h2>
                   <span className={`ml-2 px-2 py-1 text-xs rounded-full ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`}>
                     {filteredClients.length} total
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-                  <input
-                    type="text"
-                    placeholder="Search clients…"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className={`${themeStyles.input} border p-2 rounded-lg w-full md:w-64`}
-                  />
-                  <button
-                    onClick={() => { resetForm(); setActivePage("onboarding"); }}
-                    className={`px-4 py-2 rounded-lg text-white ${themeStyles.button} flex items-center gap-2 justify-center whitespace-nowrap`}
-                  >
+                  <input type="text" placeholder="Search my clients…" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+                    className={`${themeStyles.input} border p-2 rounded-lg w-full md:w-64`} />
+                  <button onClick={() => { resetForm(); setActivePage("onboarding"); }}
+                    className={`px-4 py-2 rounded-lg text-white ${themeStyles.button} flex items-center gap-2 justify-center whitespace-nowrap`}>
                     <span>➕</span> Add New
                   </button>
                 </div>
@@ -1027,10 +802,8 @@ const ClientOnboardingForm = () => {
                     {searchTerm ? "Try a different search term" : "Add your first client to get started"}
                   </p>
                   {!searchTerm && (
-                    <button
-                      onClick={() => setActivePage("onboarding")}
-                      className={`px-6 py-2 rounded-lg text-white ${themeStyles.button} inline-flex items-center gap-2`}
-                    >
+                    <button onClick={() => setActivePage("onboarding")}
+                      className={`px-6 py-2 rounded-lg text-white ${themeStyles.button} inline-flex items-center gap-2`}>
                       <span>➕</span> Add New Client
                     </button>
                   )}
@@ -1052,69 +825,41 @@ const ClientOnboardingForm = () => {
                         <th className="p-3 text-left">Attachments</th>
                         <th className="p-3 text-left">Added On</th>
                         <th className="p-3 text-left">Actions</th>
-                       </tr>
+                      </tr>
                     </thead>
                     <tbody>
                       {filteredClients.map((client, index) => (
-                        <tr
-                          key={client._id || client.id}
-                          className={`border-b ${themeStyles.border} ${themeStyles.tableRow}`}
-                        >
+                        <tr key={client._id || client.id} className={`border-b ${themeStyles.border} ${themeStyles.tableRow}`}>
                           <td className="p-3 text-sm">{index + 1}</td>
                           <td className="p-3 font-medium">{client.clientName}</td>
                           <td className="p-3">{client.clientPocName}</td>
                           <td className="p-3">
-                            <a href={`mailto:${client.clientPocEmail}`} className="text-blue-500 hover:underline">
-                              {client.clientPocEmail}
-                            </a>
+                            <a href={`mailto:${client.clientPocEmail}`} className="text-blue-500 hover:underline">{client.clientPocEmail}</a>
                           </td>
                           <td className="p-3">
-                            <a href={`tel:${client.clientPocMobile}`} className="text-blue-500 hover:underline">
-                              {client.clientPocMobile}
-                            </a>
+                            <a href={`tel:${client.clientPocMobile}`} className="text-blue-500 hover:underline">{client.clientPocMobile}</a>
                           </td>
                           <td className="p-3">
-                            {client.clientVanderEmail ? (
-                              <a href={`mailto:${client.clientVanderEmail}`} className="text-blue-500 hover:underline">
-                                {client.clientVanderEmail}
-                              </a>
-                            ) : "-"}
+                            {client.clientVanderEmail
+                              ? <a href={`mailto:${client.clientVanderEmail}`} className="text-blue-500 hover:underline">{client.clientVanderEmail}</a>
+                              : "-"}
                           </td>
                           <td className="p-3">{client.ourPocName}</td>
-                          <td className="p-3">
-                            {client.startDate ? new Date(client.startDate).toLocaleDateString("en-IN") : "-"}
-                          </td>
+                          <td className="p-3">{client.startDate ? new Date(client.startDate).toLocaleDateString("en-IN") : "-"}</td>
                           <td className="p-3">{client.paymentTerms || "30"} Days</td>
                           <td className="p-3">
                             {client.attachments?.length > 0 ? (
-                              <button
-                                onClick={() => viewAttachments(client)}
-                                className="flex items-center gap-1 text-blue-500 hover:text-blue-600 hover:underline transition-colors"
-                                title="View and download attachments"
-                              >
+                              <button onClick={() => viewAttachments(client)}
+                                className="flex items-center gap-1 text-blue-500 hover:text-blue-600 hover:underline transition-colors">
                                 📎 {client.attachments.length} file(s)
                               </button>
-                            ) : (
-                              <span className="text-gray-400">-</span>
-                            )}
+                            ) : <span className="text-gray-400">-</span>}
                           </td>
                           <td className="p-3 text-sm">{formatDate(client.createdAt)}</td>
                           <td className="p-3">
                             <div className="flex gap-2">
-                              <button
-                                onClick={() => editClient(client)}
-                                className="p-2 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                                title="Edit Client"
-                              >
-                                ✏️
-                              </button>
-                              <button
-                                onClick={() => confirmDelete(client)}
-                                className="p-2 text-red-600 hover:bg-red-100 rounded transition-colors"
-                                title="Delete Client"
-                              >
-                                🗑️
-                              </button>
+                              <button onClick={() => editClient(client)} className="p-2 text-blue-600 hover:bg-blue-100 rounded transition-colors" title="Edit">✏️</button>
+                              <button onClick={() => confirmDelete(client)} className="p-2 text-red-600 hover:bg-red-100 rounded transition-colors" title="Delete">🗑️</button>
                             </div>
                           </td>
                         </tr>
