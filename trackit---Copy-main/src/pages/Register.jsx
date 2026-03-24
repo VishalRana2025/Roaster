@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import logo from "../Image/Untitled-design-7-1 (1).webp"; // Adjust the path based on your folder structure
+import logo from "../Image/Untitled-design-7-1.webp"; // Fixed the path (removed duplicate (1))
 
 const Register = () => {
   const navigate = useNavigate();
@@ -48,9 +48,7 @@ const Register = () => {
       !formData.password ||
       !formData.employeeId ||
       !formData.department ||
-      !formData.phoneNumber ||
-      !formData.agreePolicy ||
-      !formData.agreeTracking
+      !formData.phoneNumber
     ) {
       alert("Please fill all required fields.");
       return;
@@ -109,12 +107,15 @@ const Register = () => {
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#7b3fe4] to-[#23c4c4]">
       <div className="bg-[#2c2966] w-[500px] rounded-lg shadow-2xl p-8">
         
-        
         <div className="flex justify-center mb-4">
           <img 
             src={logo} 
             alt="Company Logo" 
             className="h-20 w-auto object-contain bg-white p-2 rounded-lg shadow-lg"
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = "https://via.placeholder.com/80x80?text=Logo";
+            }}
           />
         </div>
 
@@ -122,7 +123,13 @@ const Register = () => {
           Employee Registration
         </h2>
         
-        
+        <button
+          type="button"
+          onClick={() => setShowLocationDetails(!showLocationDetails)}
+          className="mb-4 text-xs text-blue-300 hover:text-blue-200 underline w-full text-center"
+        >
+          {showLocationDetails ? "Hide" : "Show"} Office Location Details
+        </button>
         
         {showLocationDetails && (
           <div className="bg-blue-800 text-white p-3 rounded-lg mb-4 text-xs border border-blue-400">
@@ -190,8 +197,8 @@ const Register = () => {
               className="w-full p-3 rounded-md bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
               required
             >
-             
-              <option value="AccountingT">Accounting</option>
+              <option value="">Select Department *</option>
+              <option value="Accounting">Accounting</option>
               <option value="Business Development">Business Development</option>
               <option value="C-Suite">C-Suite</option>
               <option value="Finance">Finance</option>
@@ -209,7 +216,7 @@ const Register = () => {
           </div>
 
           <input
-            type="text"
+            type="tel"
             name="phoneNumber"
             placeholder="Phone Number *"
             value={formData.phoneNumber}
@@ -228,11 +235,8 @@ const Register = () => {
             required
           />
 
-        
-          
-
           <div className="flex justify-between items-center mt-6">
-            <img src alt="" className="h-8 w-auto opacity-50" />
+            <div className="w-16"></div> {/* Spacer for balance */}
             <button
               type="submit"
               className="bg-[#4caf50] hover:bg-green-600 transition text-white px-8 py-3 rounded-md font-semibold shadow-lg"
@@ -244,7 +248,15 @@ const Register = () => {
       </div>
       
       <div className="flex items-center gap-2 text-white text-sm mt-8">
-        <img src={logo} alt="" className="h-6 w-auto" />
+        <img 
+          src={logo} 
+          alt="Company Logo" 
+          className="h-6 w-auto"
+          onError={(e) => {
+            e.target.onerror = null;
+            e.target.style.display = 'none';
+          }}
+        />
         <p>
           Already have an account?
           <span
@@ -255,8 +267,6 @@ const Register = () => {
           </span>
         </p>
       </div>
-
-
     </div>
   );
 };

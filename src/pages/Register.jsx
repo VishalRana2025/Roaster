@@ -205,16 +205,23 @@ const Register = () => {
               className="w-full p-3 rounded-md bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
               required
             >
-              <option value="">Select Dept *</option>
-              <option value="IT">IT</option>
-              <option value="HR">HR</option>
+                <option value="">Select Department *</option>
+              <option value="Accounting">Accounting</option>
+              <option value="Business Development">Business Development</option>
+              <option value="C-Suite">C-Suite</option>
               <option value="Finance">Finance</option>
-              <option value="Operations">Operations</option>
-              <option value="Sales">Sales</option>
+              <option value="Founder's Office">Founder's Office</option>
+              <option value="Growth Operations">Growth Operations</option>
+              <option value="Polycheme">Polycheme</option>
               <option value="Marketing">Marketing</option>
+              <option value="RPO">RPO</option>
+              <option value="Talent & People">Talent & People</option>
+              <option value="Technology & Infrastructure">Technology & Infrastructure</option>
+              <option value="Virtual Operations">Virtual Operations</option>
+              <option value="Workplace Operations">Workplace Operations</option>
+              <option value="Blanks">(Blanks)</option>
             </select>
           </div>
-
           <input
             type="text"
             name="phoneNumber"
@@ -235,45 +242,8 @@ const Register = () => {
             required
           />
 
-          {/* Location Info Notice with Logo */}
-          <div className="bg-yellow-100 p-3 rounded-md flex items-start gap-2">
-            <img src={logo} alt="" className="h-8 w-8 object-contain rounded" />
-            <div>
-              <p className="text-xs text-yellow-800 font-medium mb-1 flex items-center gap-1">
-                <span>📍</span> Location Tracking Info:
-              </p>
-              <p className="text-xs text-yellow-700">
-                Your location will be tracked at: <span className="font-semibold">Nxone Tech Tower, Sector 62</span>
-                <br />
-                You must be within <span className="font-semibold">{COMPANY_LOCATION.radius}m</span> of this location to mark attendance.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-start text-xs text-gray-300 space-x-2">
-            <input
-              type="checkbox"
-              name="agreePolicy"
-              checked={formData.agreePolicy}
-              onChange={handleChange}
-              className="mt-1"
-              required
-            />
-            <p>I agree to attendance and company policies of Nxone Tech Tower.</p>
-          </div>
-
-          <div className="flex items-start text-xs text-gray-300 space-x-2">
-            <input
-              type="checkbox"
-              name="agreeTracking"
-              checked={formData.agreeTracking}
-              onChange={handleChange}
-              className="mt-1"
-              required
-            />
-            <p>I consent to location tracking during attendance at Nxone Tech Tower premises.</p>
-          </div>
-
+         
+         
           <div className="flex justify-between items-center mt-6">
             <img src alt="" className="h-8 w-auto opacity-50" />
             <button
