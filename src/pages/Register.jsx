@@ -23,9 +23,6 @@ const Register = () => {
     employeeId: "",
     department: "",
     phoneNumber: "",
-    companyLocation: COMPANY_LOCATION,
-    agreePolicy: false,
-    agreeTracking: false,
   });
 
   const [showLocationDetails, setShowLocationDetails] = useState(false);
@@ -48,9 +45,7 @@ const Register = () => {
       !formData.password ||
       !formData.employeeId ||
       !formData.department ||
-      !formData.phoneNumber ||
-      !formData.agreePolicy ||
-      !formData.agreeTracking
+      !formData.phoneNumber 
     ) {
       alert("Please fill all required fields.");
       return;
@@ -109,7 +104,6 @@ const Register = () => {
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#7b3fe4] to-[#23c4c4]">
       <div className="bg-[#2c2966] w-[500px] rounded-lg shadow-2xl p-8">
         
-        
         <div className="flex justify-center mb-4">
           <img 
             src={logo} 
@@ -121,23 +115,6 @@ const Register = () => {
         <h2 className="text-white text-center text-2xl font-medium mb-2">
           Employee Registration
         </h2>
-        
-        {/* Company Location Banner with Logo Integration
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 rounded-lg mb-6 flex items-center gap-3">
-          <div className="bg-white rounded-full p-2">
-            <span className="text-blue-600 text-xl">📍</span>
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-semibold">Office Location</p>
-            <p className="text-xs">Nxone Tech Tower, Sector 62, Noida</p>
-            <button 
-              onClick={() => setShowLocationDetails(!showLocationDetails)}
-              className="text-xs underline mt-1 hover:text-yellow-300"
-            >
-              {showLocationDetails ? "Hide Details" : "View Location Details"}
-            </button>
-          </div>
-        </div> */}
         
         {showLocationDetails && (
           <div className="bg-blue-800 text-white p-3 rounded-lg mb-4 text-xs border border-blue-400">
@@ -205,7 +182,7 @@ const Register = () => {
               className="w-full p-3 rounded-md bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
               required
             >
-                <option value="">Select Department *</option>
+              <option value="">Select Department *</option>
               <option value="Accounting">Accounting</option>
               <option value="Business Development">Business Development</option>
               <option value="C-Suite">C-Suite</option>
@@ -222,6 +199,7 @@ const Register = () => {
               <option value="Blanks">(Blanks)</option>
             </select>
           </div>
+          
           <input
             type="text"
             name="phoneNumber"
@@ -241,8 +219,6 @@ const Register = () => {
             className="w-full p-3 rounded-md bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
             required
           />
-
-         
          
           <div className="flex justify-between items-center mt-6">
             <img src alt="" className="h-8 w-auto opacity-50" />
@@ -268,12 +244,6 @@ const Register = () => {
           </span>
         </p>
       </div>
-
-      {/* Footer with company location and logo
-      <div className="flex items-center gap-2 text-white text-xs mt-4 opacity-70">
-        <img src={logo} alt="" className="h-4 w-auto" />
-        <span>© 2024 Nxone Tech Tower • Sector 62, Noida</span>
-      </div> */}
     </div>
   );
 };
