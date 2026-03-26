@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import logo from "../Image/Untitled-design-7-1 (1).webp";
 import axios from "axios";
 
-const API_BASE = "https://tractor-tricks-hayes-nashville.trycloudflare.com/api";
+const API_BASE = "https://trackit-copy.onrender.com/api";
 
 const ClientOnboardingForm = () => {
   const navigate = useNavigate();
@@ -14,7 +14,7 @@ const ClientOnboardingForm = () => {
     return savedTheme ? savedTheme === "dark" : true;
   });
 
-  const [activePage, setActivePage] = useState("clients");
+  const [activePage, setActivePage] = useState("onboarding");
   const [clients, setClients] = useState([]);
   const [selectedClient, setSelectedClient] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -25,48 +25,20 @@ const ClientOnboardingForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showAttachmentsModal, setShowAttachmentsModal] = useState(false);
   const [selectedClientForAttachments, setSelectedClientForAttachments] = useState(null);
-  
-  // State for requirement form
-  const [requirements, setRequirements] = useState([]);
-  const [showRequirementsList, setShowRequirementsList] = useState(false);
-  const [selectedClientForRequirementsList, setSelectedClientForRequirementsList] = useState(null);
-  const [editingRequirement, setEditingRequirement] = useState(null);
-  const [selectedRequirementClient, setSelectedRequirementClient] = useState("");
-  const [requirementSearchTerm, setRequirementSearchTerm] = useState("");
 
   const defaultForm = {
     clientName: "",
     clientPocName: "",
     clientPocEmail: "",
     clientPocMobile: "",
-    clientVanderEmail: "",
+    clientVendorEmail: "",
     ourPocName: "",
     startDate: "",
     paymentTerms: "30",
     attachments: [],
   };
 
-  const defaultRequirementForm = {
-    clientName: "",
-    requirementReceivedDate: "",
-    agent: "",
-    process: "",
-    designationPosition: "",
-    requirementType: "Regular",
-    noOfRequirement: "",
-    driveDate: "",
-    requirementDeadline: "",
-    budget: "",
-    payoutCommissionRs: "",
-    payoutCommissionPercent: "",
-    additionalNotes: "",
-    fileUploads: [],
-  };
-
   const [clientForm, setClientForm] = useState(defaultForm);
-  const [requirementForm, setRequirementForm] = useState(defaultRequirementForm);
-  const [requirementAttachments, setRequirementAttachments] = useState([]);
-  const [requirementUploadProgress, setRequirementUploadProgress] = useState({});
 
   useEffect(() => {
     const userStr = localStorage.getItem("currentUser");
@@ -78,7 +50,6 @@ const ClientOnboardingForm = () => {
       const user = JSON.parse(userStr);
       setCurrentUser(user);
       loadClients();
-      loadRequirements();
     } catch (error) {
       console.error("Error parsing user data:", error);
       localStorage.removeItem("currentUser");
@@ -86,11 +57,12 @@ const ClientOnboardingForm = () => {
     }
   }, [navigate]);
 
-  // Load all clients
+  // ── Data Layer - Load ALL clients (no filtering) ─────────────────────────
   const loadClients = async () => {
     setIsLoading(true);
     try {
       const res = await axios.get(`${API_BASE}/clients`);
+      // NO FILTERING - show ALL clients to everyone
       const allClients = res.data || [];
       setClients(
         allClients.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
@@ -109,18 +81,8 @@ const ClientOnboardingForm = () => {
     }
   };
 
-  // Load requirements
-  const loadRequirements = async () => {
-  try {
-    const res = await axios.get(`${API_BASE}/requirements`);
-    setRequirements(res.data || []);
-  } catch (error) {
-    console.log("No requirements API yet");
-    setRequirements([]);
-  }
-};
-
   const createClient = async (clientData) => {
+    // Add current user's info for tracking who created, but still show to everyone
     const dataWithUser = {
       ...clientData,
       createdBy: currentUser.id,
@@ -128,7 +90,7 @@ const ClientOnboardingForm = () => {
       createdByName: `${currentUser.firstName} ${currentUser.lastName}`,
       createdByEmployeeId: currentUser.employeeId,
     };
-    const res = await axios.post(`${API_BASE}/add-client`, clientData, {
+    const res = await axios.post(`${API_BASE}/add-client`, dataWithUser, {
       maxBodyLength: Infinity,
       maxContentLength: Infinity,
       headers: {
@@ -153,43 +115,7 @@ const ClientOnboardingForm = () => {
     await axios.delete(`${API_BASE}/delete-client/${id}`);
   };
 
-  // Create requirement
-  const createRequirement = async (requirementData) => {
-    const dataWithUser = {
-      ...requirementData,
-      createdBy: currentUser.id,
-      createdByEmail: currentUser.email,
-      createdByName: `${currentUser.firstName} ${currentUser.lastName}`,
-      createdByEmployeeId: currentUser.employeeId,
-    };
-    const res = await axios.post(`${API_BASE}/add-requirement`, dataWithUser, {
-      maxBodyLength: Infinity,
-      maxContentLength: Infinity,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-    return res.data;
-  };
-
-  // Update requirement
-  const updateRequirement = async (id, requirementData) => {
-    const res = await axios.put(`${API_BASE}/update-requirement/${id}`, requirementData, {
-      maxBodyLength: Infinity,
-      maxContentLength: Infinity,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-    return res.data;
-  };
-
-  // Delete requirement
-  const deleteRequirement = async (id) => {
-    await axios.delete(`${API_BASE}/delete-requirement/${id}`);
-  };
-
-  // Theme toggle
+  // ── Theme ──────────────────────────────────────────────────────────────────
   const toggleTheme = () => {
     setIsDarkMode((prev) => {
       const newTheme = !prev;
@@ -225,12 +151,9 @@ const ClientOnboardingForm = () => {
     buttonDanger: isDarkMode
       ? "bg-red-600 hover:bg-red-700"
       : "bg-red-500 hover:bg-red-600",
-    buttonWarning: isDarkMode
-      ? "bg-yellow-600 hover:bg-yellow-700"
-      : "bg-yellow-500 hover:bg-yellow-600",
   };
 
-  // File compression function
+  // ── File Compression Function ─────────────────────────────────────────────
   const compressImage = (file) => {
     return new Promise((resolve, reject) => {
       if (!file.type.startsWith('image/')) {
@@ -285,13 +208,12 @@ const ClientOnboardingForm = () => {
     });
   };
 
-  // Form helpers for client
+  // ── Form Helpers ───────────────────────────────────────────────────────────
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setClientForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Client file upload handler
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
@@ -299,66 +221,76 @@ const ClientOnboardingForm = () => {
     setIsLoading(true);
     
     for (const file of files) {
-      if (file.size > 3 * 1024 * 1024) {
-        alert(`File "${file.name}" exceeds the 3 MB limit. Please compress or use a smaller file.`);
-        continue;
-      }
+  try {
+    let processedFile = file;
 
-      try {
-        let processedFile = file;
-        
-        if (file.type.startsWith('image/')) {
-          processedFile = await compressImage(file);
-          console.log(`Compressed ${file.name}: ${(file.size / 1024 / 1024).toFixed(2)}MB -> ${(processedFile.size / 1024 / 1024).toFixed(2)}MB`);
-        }
-        
-        const fileId = `${Date.now()}-${Math.random().toString(36).slice(2)}-${processedFile.name}`;
-        
-        setUploadProgress((prev) => ({ ...prev, [fileId]: 0 }));
-        
-        const reader = new FileReader();
-        
-        reader.onerror = () => {
-          alert(`Failed to read file "${processedFile.name}". Please try again.`);
-          setUploadProgress((prev) => {
-            const updated = { ...prev };
-            delete updated[fileId];
-            return updated;
-          });
-        };
-        
-        reader.onload = (event) => {
-          const fileData = {
-            id: fileId,
-            name: processedFile.name,
-            type: processedFile.type,
-            size: processedFile.size,
-            data: event.target.result,
-            uploadedAt: new Date().toISOString(),
-          };
-          
-          setAttachments((prev) => {
-            const updated = [...prev, fileData];
-            setClientForm((prevForm) => ({ ...prevForm, attachments: updated }));
-            return updated;
-          });
-          
-          setUploadProgress((prev) => ({ ...prev, [fileId]: 100 }));
-          setTimeout(() => {
-            setUploadProgress((prev) => {
-              const updated = { ...prev };
-              delete updated[fileId];
-              return updated;
-            });
-          }, 1000);
-        };
-        
-        reader.readAsDataURL(processedFile);
-      } catch (error) {
-        console.error('Error processing file:', error);
-        alert(`Failed to process file "${file.name}". Please try again.`);
-      }
+    // ✅ compress image
+    if (file.type.startsWith("image/")) {
+      processedFile = await compressImage(file);
+      console.log(
+        `Compressed ${file.name}: ${(file.size / 1024 / 1024).toFixed(2)}MB -> ${(processedFile.size / 1024 / 1024).toFixed(2)}MB`
+      );
     }
+
+    // ✅ size check AFTER compression
+    if (processedFile.size > 3 * 1024 * 1024) {
+      alert(`File "${file.name}" still exceeds 3 MB after compression.`);
+      continue;
+    }
+
+    const fileId = `${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2)}-${processedFile.name}`;
+
+    setUploadProgress((prev) => ({ ...prev, [fileId]: 0 }));
+
+    const reader = new FileReader();
+
+    reader.onerror = () => {
+      alert(`Failed to read file "${processedFile.name}".`);
+      setUploadProgress((prev) => {
+        const updated = { ...prev };
+        delete updated[fileId];
+        return updated;
+      });
+    };
+
+    reader.onload = (event) => {
+      const fileData = {
+        id: fileId,
+        name: processedFile.name,
+        type: processedFile.type,
+        size: processedFile.size,
+        data: event.target.result,
+        uploadedAt: new Date().toISOString(),
+      };
+
+      setAttachments((prev) => {
+        const updated = [...prev, fileData];
+        setClientForm((prevForm) => ({
+          ...prevForm,
+          attachments: updated,
+        }));
+        return updated;
+      });
+
+      setUploadProgress((prev) => ({ ...prev, [fileId]: 100 }));
+
+      setTimeout(() => {
+        setUploadProgress((prev) => {
+          const updated = { ...prev };
+          delete updated[fileId];
+          return updated;
+        });
+      }, 1000);
+    };
+
+    reader.readAsDataURL(processedFile);
+  } catch (error) {
+    console.error("Error processing file:", error);
+    alert(`Failed to process file "${file.name}".`);
+  }
+}
     
     setIsLoading(false);
     e.target.value = "";
@@ -369,92 +301,6 @@ const ClientOnboardingForm = () => {
     setClientForm((prev) => ({
       ...prev,
       attachments: (prev.attachments || []).filter((f) => f.id !== fileId),
-    }));
-  };
-
-  // Form helpers for requirement
-  const handleRequirementInputChange = (e) => {
-    const { name, value } = e.target;
-    setRequirementForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleRequirementFileUpload = async (e) => {
-    const files = Array.from(e.target.files);
-    if (!files.length) return;
-
-    setIsLoading(true);
-    
-    for (const file of files) {
-      if (file.size > 3 * 1024 * 1024) {
-        alert(`File "${file.name}" exceeds the 3 MB limit. Please compress or use a smaller file.`);
-        continue;
-      }
-
-      try {
-        let processedFile = file;
-        
-        if (file.type.startsWith('image/')) {
-          processedFile = await compressImage(file);
-          console.log(`Compressed ${file.name}: ${(file.size / 1024 / 1024).toFixed(2)}MB -> ${(processedFile.size / 1024 / 1024).toFixed(2)}MB`);
-        }
-        
-        const fileId = `${Date.now()}-${Math.random().toString(36).slice(2)}-${processedFile.name}`;
-        
-        setRequirementUploadProgress((prev) => ({ ...prev, [fileId]: 0 }));
-        
-        const reader = new FileReader();
-        
-        reader.onerror = () => {
-          alert(`Failed to read file "${processedFile.name}". Please try again.`);
-          setRequirementUploadProgress((prev) => {
-            const updated = { ...prev };
-            delete updated[fileId];
-            return updated;
-          });
-        };
-        
-        reader.onload = (event) => {
-          const fileData = {
-            id: fileId,
-            name: processedFile.name,
-            type: processedFile.type,
-            size: processedFile.size,
-            data: event.target.result,
-            uploadedAt: new Date().toISOString(),
-          };
-          
-          setRequirementAttachments((prev) => {
-            const updated = [...prev, fileData];
-            setRequirementForm((prevForm) => ({ ...prevForm, fileUploads: updated }));
-            return updated;
-          });
-          
-          setRequirementUploadProgress((prev) => ({ ...prev, [fileId]: 100 }));
-          setTimeout(() => {
-            setRequirementUploadProgress((prev) => {
-              const updated = { ...prev };
-              delete updated[fileId];
-              return updated;
-            });
-          }, 1000);
-        };
-        
-        reader.readAsDataURL(processedFile);
-      } catch (error) {
-        console.error('Error processing file:', error);
-        alert(`Failed to process file "${file.name}". Please try again.`);
-      }
-    }
-    
-    setIsLoading(false);
-    e.target.value = "";
-  };
-
-  const removeRequirementAttachment = (fileId) => {
-    setRequirementAttachments((prev) => prev.filter((f) => f.id !== fileId));
-    setRequirementForm((prev) => ({
-      ...prev,
-      fileUploads: (prev.fileUploads || []).filter((f) => f.id !== fileId),
     }));
   };
 
@@ -480,7 +326,7 @@ const ClientOnboardingForm = () => {
       document.body.removeChild(link);
       
       setTimeout(() => {
-        URL.revokeObjectURL(link.href);
+       
       }, 100);
       
     } catch (error) {
@@ -506,14 +352,6 @@ const ClientOnboardingForm = () => {
     setClientForm(defaultForm);
     setAttachments([]);
     setSelectedClient(null);
-    setActivePage("onboarding");
-  };
-
-  const resetRequirementForm = () => {
-    setRequirementForm(defaultRequirementForm);
-    setRequirementAttachments([]);
-    setEditingRequirement(null);
-    setSelectedRequirementClient("");
   };
 
   const validateForm = () => {
@@ -525,35 +363,13 @@ const ClientOnboardingForm = () => {
     if (!clientForm.clientPocMobile?.trim()) { alert("Client POC Mobile Number is required."); return false; }
     const mobileDigits = clientForm.clientPocMobile.replace(/\D/g, "");
     if (mobileDigits.length !== 10) { alert("Please enter a valid 10-digit mobile number."); return false; }
-    if (clientForm.clientVanderEmail && !emailRegex.test(clientForm.clientVanderEmail)) {
+    if (clientForm.clientVendorEmail && !emailRegex.test(clientForm.clientVendorEmail)) {
       alert("Please enter a valid Vendor email address."); return false;
     }
     if (!clientForm.ourPocName?.trim()) { alert("Our POC Name is required."); return false; }
     if (!clientForm.startDate) { alert("Start Date is required."); return false; }
     
     const totalSize = attachments.reduce((sum, file) => sum + file.size, 0);
-    if (totalSize > 10 * 1024 * 1024) {
-      alert("Total attachments size exceeds 10 MB. Please remove some files.");
-      return false;
-    }
-    
-    return true;
-  };
-
-  const validateRequirementForm = () => {
-    if (!requirementForm.clientName?.trim()) { alert("Client Name is required."); return false; }
-    if (!requirementForm.requirementReceivedDate) { alert("Requirement Received Date is required."); return false; }
-    if (!requirementForm.agent?.trim()) { alert("Agent is required."); return false; }
-    if (!requirementForm.process?.trim()) { alert("Process is required."); return false; }
-    if (!requirementForm.designationPosition?.trim()) { alert("Designation/Position is required."); return false; }
-    if (!requirementForm.requirementType) { alert("Requirement Type is required."); return false; }
-    if (!requirementForm.noOfRequirement) { alert("Number of Requirements is required."); return false; }
-    if (requirementForm.noOfRequirement <= 0) { alert("Number of Requirements must be greater than 0."); return false; }
-    if (!requirementForm.driveDate) { alert("Drive Date is required."); return false; }
-    if (!requirementForm.requirementDeadline) { alert("Requirement Deadline is required."); return false; }
-    if (!requirementForm.budget) { alert("Budget is required."); return false; }
-    
-    const totalSize = requirementAttachments.reduce((sum, file) => sum + file.size, 0);
     if (totalSize > 10 * 1024 * 1024) {
       alert("Total attachments size exceeds 10 MB. Please remove some files.");
       return false;
@@ -594,13 +410,11 @@ const ClientOnboardingForm = () => {
         );
         alert("Client updated successfully!");
         resetForm();
-        setActivePage("clients");
       } else {
         await createClient(clientData);
         await loadClients();
         alert("Client onboarded successfully!");
         resetForm();
-        setActivePage("clients");
       }
     } catch (error) {
       console.error("Error saving client:", error);
@@ -617,45 +431,19 @@ const ClientOnboardingForm = () => {
     }
   };
 
-  const saveRequirement = async () => {
-    if (!validateRequirementForm()) return;
-    if (!currentUser) { alert("User not authenticated."); return; }
-
-    const now = new Date().toISOString();
-
-    const requirementData = {
-      ...requirementForm,
-      fileUploads: requirementAttachments,
-      createdBy: currentUser.id,
-      createdByEmail: currentUser.email,
-      createdByName: `${currentUser.firstName} ${currentUser.lastName}`,
-      createdByEmployeeId: currentUser.employeeId,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    setIsLoading(true);
-    try {
-      if (editingRequirement) {
-        await updateRequirement(editingRequirement._id || editingRequirement.id, requirementData);
-        alert("Requirement updated successfully!");
-      } else {
-        await createRequirement(requirementData);
-        alert("Requirement added successfully!");
-      }
-      await loadRequirements();
-      resetRequirementForm();
-    } catch (error) {
-      console.error("Error saving requirement:", error);
-      alert("Failed to save requirement. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const editClient = (client) => {
     setSelectedClient(client);
-    setClientForm(client);
+   setClientForm({
+  clientName: client.clientName || "",
+  clientPocName: client.clientPocName || "",
+  clientPocEmail: client.clientPocEmail || "",
+  clientPocMobile: client.clientPocMobile || "",
+  clientVendorEmail: client.clientVendorEmail || "",
+  ourPocName: client.ourPocName || "",
+  startDate: client.startDate ? client.startDate.split("T")[0] : "",
+  paymentTerms: client.paymentTerms || "30",
+  attachments: client.attachments || [],
+});
     setAttachments(client.attachments || []);
     setActivePage("onboarding");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -690,75 +478,14 @@ const ClientOnboardingForm = () => {
     }
   };
 
-  const openRequirementForm = (client) => {
-    setSelectedRequirementClient(client.clientName);
-    setRequirementForm({
-      ...defaultRequirementForm,
-      clientName: client.clientName,
-    });
-    setEditingRequirement(null);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const editRequirement = (requirement) => {
-    setEditingRequirement(requirement);
-    setRequirementForm({
-      clientName: requirement.clientName,
-      requirementReceivedDate: requirement.requirementReceivedDate,
-      agent: requirement.agent,
-      process: requirement.process,
-      designationPosition: requirement.designationPosition,
-      requirementType: requirement.requirementType,
-      noOfRequirement: requirement.noOfRequirement,
-      driveDate: requirement.driveDate,
-      requirementDeadline: requirement.requirementDeadline,
-      budget: requirement.budget,
-      payoutCommissionRs: requirement.payoutCommissionRs || "",
-      payoutCommissionPercent: requirement.payoutCommissionPercent || "",
-      additionalNotes: requirement.additionalNotes || "",
-      fileUploads: requirement.fileUploads || [],
-    });
-    setRequirementAttachments(requirement.fileUploads || []);
-    setSelectedRequirementClient(requirement.clientName);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const viewRequirements = (client) => {
-    const clientRequirements = requirements.filter(req => req.clientName === client.clientName);
-    setSelectedClientForRequirementsList(client);
-    setRequirements(clientRequirements);
-    setShowRequirementsList(true);
-  };
-
-  const deleteRequirementHandler = async (requirementId) => {
-    if (window.confirm("Are you sure you want to delete this requirement?")) {
-      try {
-        await deleteRequirement(requirementId);
-        await loadRequirements();
-        alert("Requirement deleted successfully!");
-      } catch (error) {
-        console.error("Error deleting requirement:", error);
-        alert("Failed to delete requirement. Please try again.");
-      }
-    }
-  };
-
   const filteredClients = clients.filter(
     (client) =>
       client.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       client.clientPocName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       client.ourPocName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       client.clientPocEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.clientVanderEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      client.clientVendorEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       client.clientPocMobile?.includes(searchTerm)
-  );
-
-  const filteredRequirements = requirements.filter(
-    (req) =>
-      req.clientName?.toLowerCase().includes(requirementSearchTerm.toLowerCase()) ||
-      req.agent?.toLowerCase().includes(requirementSearchTerm.toLowerCase()) ||
-      req.process?.toLowerCase().includes(requirementSearchTerm.toLowerCase()) ||
-      req.designationPosition?.toLowerCase().includes(requirementSearchTerm.toLowerCase())
   );
 
   const formatDate = (dateString) => {
@@ -770,19 +497,6 @@ const ClientOnboardingForm = () => {
         year: "numeric",
         hour: "2-digit",
         minute: "2-digit",
-      });
-    } catch {
-      return "Invalid Date";
-    }
-  };
-
-  const formatDateOnly = (dateString) => {
-    if (!dateString) return "N/A";
-    try {
-      return new Date(dateString).toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
       });
     } catch {
       return "Invalid Date";
@@ -962,112 +676,6 @@ const ClientOnboardingForm = () => {
         </div>
       )}
 
-      {/* Requirements List Modal */}
-      {showRequirementsList && selectedClientForRequirementsList && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
-          <div className={`${themeStyles.card} p-6 rounded-lg shadow-xl max-w-6xl w-full mx-4 my-8 max-h-[90vh] overflow-y-auto`}>
-            <div className="flex justify-between items-center mb-4 sticky top-0 bg-inherit z-10 pb-2">
-              <div>
-                <h3 className="text-xl font-semibold">
-                  Requirements - {selectedClientForRequirementsList.clientName}
-                </h3>
-                <p className={`text-sm ${themeStyles.secondaryText} mt-1`}>
-                  {requirements.filter(r => r.clientName === selectedClientForRequirementsList.clientName).length} requirement(s) found
-                </p>
-              </div>
-              <button
-                onClick={() => setShowRequirementsList(false)}
-                className="text-gray-500 hover:text-gray-700 text-2xl"
-              >
-                ×
-              </button>
-            </div>
-
-            {requirements.filter(r => r.clientName === selectedClientForRequirementsList.clientName).length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className={themeStyles.tableHeader}>
-                      <th className="p-3 text-left">S.No</th>
-                      <th className="p-3 text-left">Received Date</th>
-                      <th className="p-3 text-left">Agent</th>
-                      <th className="p-3 text-left">Process</th>
-                      <th className="p-3 text-left">Designation</th>
-                      <th className="p-3 text-left">Type</th>
-                      <th className="p-3 text-left">No. of Req</th>
-                      <th className="p-3 text-left">Drive Date</th>
-                      <th className="p-3 text-left">Deadline</th>
-                      <th className="p-3 text-left">Budget</th>
-                      <th className="p-3 text-left">Payout (₹)</th>
-                      <th className="p-3 text-left">Payout (%)</th>
-                      <th className="p-3 text-left">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {requirements
-                      .filter(r => r.clientName === selectedClientForRequirementsList.clientName)
-                      .map((req, index) => (
-                        <tr key={req._id || req.id} className={`border-b ${themeStyles.border} ${themeStyles.tableRow}`}>
-                          <td className="p-3 text-sm">{index + 1}</td>
-                          <td className="p-3">{formatDateOnly(req.requirementReceivedDate)}</td>
-                          <td className="p-3">{req.agent}</td>
-                          <td className="p-3">{req.process}</td>
-                          <td className="p-3">{req.designationPosition}</td>
-                          <td className="p-3">
-                            <span className={`px-2 py-1 rounded-full text-xs ${
-                              req.requirementType === 'Bonanza' ? 'bg-purple-100 text-purple-800' :
-                              req.requirementType === 'Regular' ? 'bg-green-100 text-green-800' :
-                              'bg-orange-100 text-orange-800'
-                            }`}>
-                              {req.requirementType}
-                            </span>
-                          </td>
-                          <td className="p-3 text-center">{req.noOfRequirement}</td>
-                          <td className="p-3">{formatDateOnly(req.driveDate)}</td>
-                          <td className="p-3">{formatDateOnly(req.requirementDeadline)}</td>
-                          <td className="p-3">{req.budget}</td>
-                          <td className="p-3">{req.payoutCommissionRs || '-'}</td>
-                          <td className="p-3">{req.payoutCommissionPercent ? `${req.payoutCommissionPercent}%` : '-'}</td>
-                          <td className="p-3">
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => {
-                                  setShowRequirementsList(false);
-                                  editRequirement(req);
-                                  setActivePage("requirements");
-                                }}
-                                className="p-2 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                                title="Edit Requirement"
-                              >
-                                ✏️
-                              </button>
-                              <button
-                                onClick={() => deleteRequirementHandler(req._id || req.id)}
-                                className="p-2 text-red-600 hover:bg-red-100 rounded transition-colors"
-                                title="Delete Requirement"
-                              >
-                                🗑️
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <span className="text-5xl mb-4 block opacity-50">📋</span>
-                <p className={`text-lg ${themeStyles.secondaryText}`}>No requirements found</p>
-                <p className={`text-sm ${themeStyles.secondaryText} mt-2`}>
-                  Add requirements for this client to get started
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* SIDEBAR */}
       <div className={`w-64 ${themeStyles.sidebar} text-white flex flex-col`}>
         <div className="p-6 text-center border-b border-gray-700">
@@ -1079,7 +687,7 @@ const ClientOnboardingForm = () => {
 
         <ul className="mt-4 flex-1">
           <li
-            onClick={() => { resetForm(); setActivePage("onboarding"); }}
+            onClick={() => setActivePage("onboarding")}
             className={`px-6 py-3 cursor-pointer transition-colors flex items-center gap-2 ${
               activePage === "onboarding" ? "bg-blue-600" : "hover:bg-blue-500"
             }`}
@@ -1094,27 +702,12 @@ const ClientOnboardingForm = () => {
           >
             <span>👥</span> All Clients
           </li>
-          <li
-            onClick={() => {
-              setActivePage("requirements");
-              resetRequirementForm();
-            }}
-            className={`px-6 py-3 cursor-pointer transition-colors flex items-center gap-2 ${
-              activePage === "requirements" ? "bg-blue-600" : "hover:bg-blue-500"
-            }`}
-          >
-            <span>📋</span> Client Requirements
-          </li>
         </ul>
 
         <div className="p-4 text-xs text-gray-400 border-t border-gray-700">
           <div className="mb-2">
             <p className="font-medium text-gray-300">Total Clients</p>
             <p className="text-xl text-yellow-400">{clients.length}</p>
-          </div>
-          <div className="mb-2">
-            <p className="font-medium text-gray-300">Total Requirements</p>
-            <p className="text-xl text-yellow-400">{requirements.length}</p>
           </div>
           <div className="flex items-center gap-2 mb-1">
             <img src={logo} alt="" className="h-4 w-auto opacity-50" />
@@ -1131,8 +724,7 @@ const ClientOnboardingForm = () => {
             <img src={logo} alt="" className="h-8 w-auto bg-white p-1 rounded" />
             <h1 className="text-xl font-semibold">
               {activePage === "onboarding" && (selectedClient ? "✏️ Edit Client" : "New Client Onboarding")}
-              {activePage === "clients" && "All Clients"}
-              {activePage === "requirements" && "Client Requirements"}
+              {activePage === "clients" && "👥 All Clients"}
             </h1>
           </div>
           <div className="flex items-center gap-4">
@@ -1260,8 +852,8 @@ const ClientOnboardingForm = () => {
                       <label className="block mb-2 font-medium">Client Vendor Email</label>
                       <input
                         type="email"
-                        name="clientVanderEmail"
-                        value={clientForm.clientVanderEmail}
+                        name="clientVendorEmail"
+                        value={clientForm.clientVendorEmail}
                         onChange={handleInputChange}
                         className={`${themeStyles.input} border p-3 w-full rounded-lg focus:ring-2 focus:ring-blue-500 outline-none`}
                         placeholder="Enter client vendor email"
@@ -1452,7 +1044,7 @@ const ClientOnboardingForm = () => {
                     onClick={() => { resetForm(); setActivePage("onboarding"); }}
                     className={`px-4 py-2 rounded-lg text-white ${themeStyles.button} flex items-center gap-2 justify-center whitespace-nowrap`}
                   >
-                    <span>➕</span> Add New Client
+                    <span>➕</span> Add New
                   </button>
                 </div>
               </div>
@@ -1493,11 +1085,10 @@ const ClientOnboardingForm = () => {
                         <th className="p-3 text-left">Start Date</th>
                         <th className="p-3 text-left">Payment Terms</th>
                         <th className="p-3 text-left">Attachments</th>
-                        <th className="p-3 text-left">Requirements</th>
                         <th className="p-3 text-left">Added On</th>
                         <th className="p-3 text-left">Created By</th>
                         <th className="p-3 text-left">Actions</th>
-                      </tr>
+                       </tr>
                     </thead>
                     <tbody>
                       {filteredClients.map((client, index) => (
@@ -1519,9 +1110,9 @@ const ClientOnboardingForm = () => {
                             </a>
                           </td>
                           <td className="p-3">
-                            {client.clientVanderEmail ? (
-                              <a href={`mailto:${client.clientVanderEmail}`} className="text-blue-500 hover:underline">
-                                {client.clientVanderEmail}
+                            {client.clientVendorEmail ? (
+                              <a href={`mailto:${client.clientVendorEmail}`} className="text-blue-500 hover:underline">
+                                {client.clientVendorEmail}
                               </a>
                             ) : "-"}
                           </td>
@@ -1542,27 +1133,6 @@ const ClientOnboardingForm = () => {
                             ) : (
                               <span className="text-gray-400">-</span>
                             )}
-                          </td>
-                          <td className="p-3">
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => {
-                                  openRequirementForm(client);
-                                  setActivePage("requirements");
-                                }}
-                                className="flex items-center gap-1 px-2 py-1 text-green-600 hover:bg-green-100 rounded transition-colors text-sm"
-                                title="Add Requirement"
-                              >
-                                ➕ Add
-                              </button>
-                              <button
-                                onClick={() => viewRequirements(client)}
-                                className="flex items-center gap-1 px-2 py-1 text-blue-600 hover:bg-blue-100 rounded transition-colors text-sm"
-                                title="View Requirements"
-                              >
-                                👁️ View ({requirements.filter(r => r.clientName === client.clientName).length})
-                              </button>
-                            </div>
                           </td>
                           <td className="p-3 text-sm">{formatDate(client.createdAt)}</td>
                           <td className="p-3 text-xs">
@@ -1592,435 +1162,6 @@ const ClientOnboardingForm = () => {
                   </table>
                 </div>
               )}
-            </div>
-          )}
-
-          {/* ── CLIENT REQUIREMENTS FORM ── */}
-          {activePage === "requirements" && (
-            <div className="max-w-4xl mx-auto">
-              <div className={`${themeStyles.card} p-6 rounded-lg shadow-lg`}>
-                <div className="flex justify-between items-center mb-6">
-                  <div>
-                    <h2 className="text-2xl font-bold">
-                      {editingRequirement ? "Edit Client Requirement" : "Add New Client Requirement"}
-                    </h2>
-                    <p className={`text-sm ${themeStyles.secondaryText} mt-1`}>
-                      {editingRequirement ? "Update requirement details" : "Fill in the requirement details below"}
-                    </p>
-                    {selectedRequirementClient && (
-                      <p className={`text-sm ${themeStyles.secondaryText} mt-1`}>
-                        Client: <span className="font-semibold text-blue-500">{selectedRequirementClient}</span>
-                      </p>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => {
-                      resetRequirementForm();
-                      setActivePage("clients");
-                    }}
-                    className={`px-4 py-2 rounded text-white ${themeStyles.buttonSecondary} transition-colors`}
-                  >
-                    Back to Clients
-                  </button>
-                </div>
-
-                <div className="space-y-6">
-                  {/* Client Name - Dropdown */}
-                  <div>
-                    <label className="block mb-2 font-medium">
-                      Client Name <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      name="clientName"
-                      value={requirementForm.clientName}
-                      onChange={handleRequirementInputChange}
-                      className={`${themeStyles.input} border p-3 w-full rounded-lg focus:ring-2 focus:ring-blue-500 outline-none`}
-                    >
-                      <option value="">Select a client</option>
-                      {clients.map((client) => (
-                        <option key={client._id || client.id} value={client.clientName}>
-                          {client.clientName}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Requirement Received Date */}
-                  <div>
-                    <label className="block mb-2 font-medium">
-                      Requirement Received Date <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      name="requirementReceivedDate"
-                      value={requirementForm.requirementReceivedDate}
-                      onChange={handleRequirementInputChange}
-                      className={`${themeStyles.input} border p-3 w-full rounded-lg focus:ring-2 focus:ring-blue-500 outline-none`}
-                    />
-                  </div>
-
-                  {/* Agent and Process */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block mb-2 font-medium">
-                        Agent <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="agent"
-                        value={requirementForm.agent}
-                        onChange={handleRequirementInputChange}
-                        className={`${themeStyles.input} border p-3 w-full rounded-lg focus:ring-2 focus:ring-blue-500 outline-none`}
-                        placeholder="Enter agent name"
-                      />
-                    </div>
-                    <div>
-                      <label className="block mb-2 font-medium">
-                        Process <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="process"
-                        value={requirementForm.process}
-                        onChange={handleRequirementInputChange}
-                        className={`${themeStyles.input} border p-3 w-full rounded-lg focus:ring-2 focus:ring-blue-500 outline-none`}
-                        placeholder="Enter process name"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Designation/Position */}
-                  <div>
-                    <label className="block mb-2 font-medium">
-                      Designation/Position <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="designationPosition"
-                      value={requirementForm.designationPosition}
-                      onChange={handleRequirementInputChange}
-                      className={`${themeStyles.input} border p-3 w-full rounded-lg focus:ring-2 focus:ring-blue-500 outline-none`}
-                      placeholder="Enter designation or position"
-                    />
-                  </div>
-
-                  {/* Requirement Type and Number of Requirements */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block mb-2 font-medium">
-                        Requirement Type <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        name="requirementType"
-                        value={requirementForm.requirementType}
-                        onChange={handleRequirementInputChange}
-                        className={`${themeStyles.input} border p-3 w-full rounded-lg focus:ring-2 focus:ring-blue-500 outline-none`}
-                      >
-                        <option value="Bonanza">Bonanza</option>
-                        <option value="Regular">Regular</option>
-                        <option value="FLR">FLR</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block mb-2 font-medium">
-                        Number of Requirements <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="number"
-                        name="noOfRequirement"
-                        value={requirementForm.noOfRequirement}
-                        onChange={handleRequirementInputChange}
-                        className={`${themeStyles.input} border p-3 w-full rounded-lg focus:ring-2 focus:ring-blue-500 outline-none`}
-                        placeholder="Enter number of positions"
-                        min="1"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Drive Date and Requirement Deadline */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block mb-2 font-medium">
-                        Drive Date <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        name="driveDate"
-                        value={requirementForm.driveDate}
-                        onChange={handleRequirementInputChange}
-                        className={`${themeStyles.input} border p-3 w-full rounded-lg focus:ring-2 focus:ring-blue-500 outline-none`}
-                      />
-                    </div>
-                    <div>
-                      <label className="block mb-2 font-medium">
-                        Requirement Deadline <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        name="requirementDeadline"
-                        value={requirementForm.requirementDeadline}
-                        onChange={handleRequirementInputChange}
-                        className={`${themeStyles.input} border p-3 w-full rounded-lg focus:ring-2 focus:ring-blue-500 outline-none`}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Budget */}
-                  <div>
-                    <label className="block mb-2 font-medium">
-                      Budget <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="budget"
-                      value={requirementForm.budget}
-                      onChange={handleRequirementInputChange}
-                      className={`${themeStyles.input} border p-3 w-full rounded-lg focus:ring-2 focus:ring-blue-500 outline-none`}
-                      placeholder="Enter budget amount"
-                    />
-                  </div>
-
-                  {/* Payout Commission */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block mb-2 font-medium">Payout Commission (₹)</label>
-                      <input
-                        type="number"
-                        name="payoutCommissionRs"
-                        value={requirementForm.payoutCommissionRs}
-                        onChange={handleRequirementInputChange}
-                        className={`${themeStyles.input} border p-3 w-full rounded-lg focus:ring-2 focus:ring-blue-500 outline-none`}
-                        placeholder="Enter payout amount in INR"
-                        step="0.01"
-                      />
-                    </div>
-                    <div>
-                      <label className="block mb-2 font-medium">Payout Commission (%)</label>
-                      <input
-                        type="number"
-                        name="payoutCommissionPercent"
-                        value={requirementForm.payoutCommissionPercent}
-                        onChange={handleRequirementInputChange}
-                        className={`${themeStyles.input} border p-3 w-full rounded-lg focus:ring-2 focus:ring-blue-500 outline-none`}
-                        placeholder="Enter payout percentage"
-                        step="0.01"
-                        min="0"
-                        max="100"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Additional Notes */}
-                  <div>
-                    <label className="block mb-2 font-medium">Additional Notes</label>
-                    <textarea
-                      name="additionalNotes"
-                      value={requirementForm.additionalNotes}
-                      onChange={handleRequirementInputChange}
-                      className={`${themeStyles.input} border p-3 w-full rounded-lg focus:ring-2 focus:ring-blue-500 outline-none`}
-                      placeholder="Enter any additional notes or comments"
-                      rows="3"
-                    />
-                  </div>
-
-                  {/* File Upload */}
-                  <div className="border-t pt-6">
-                    <label className="block mb-4 font-medium text-lg">📎 File Upload (Max 3MB per file, 10MB total)</label>
-                    <input
-                      id="requirement-file-upload"
-                      type="file"
-                      multiple
-                      onChange={handleRequirementFileUpload}
-                      className="hidden"
-                      accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.bmp,.txt"
-                    />
-                    <div
-                      className={`border-2 border-dashed ${themeStyles.border} rounded-lg p-6 text-center hover:border-blue-500 transition-colors cursor-pointer`}
-                      onClick={() => document.getElementById("requirement-file-upload").click()}
-                    >
-                      <div className="space-y-2">
-                        <span className="text-4xl block">📁</span>
-                        <p className="font-medium">Click to upload or drag and drop</p>
-                        <p className={`text-sm ${themeStyles.secondaryText}`}>
-                          Supported: PDF, DOC, DOCX, XLS, XLSX, Images (JPG, PNG, GIF, BMP), TXT (max 3 MB each)
-                        </p>
-                      </div>
-                    </div>
-
-                    {Object.keys(requirementUploadProgress).length > 0 && (
-                      <div className="mt-4 space-y-2">
-                        {Object.entries(requirementUploadProgress).map(([fileId, progress]) => (
-                          <div key={fileId} className="flex items-center gap-2">
-                            <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-blue-500 transition-all duration-300"
-                                style={{ width: `${progress}%` }}
-                              />
-                            </div>
-                            <span className="text-xs">{progress}%</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {requirementAttachments.length > 0 && (
-                      <div className="mt-4 space-y-2">
-                        <h4 className="font-medium mb-2">Uploaded Files:</h4>
-                        {requirementAttachments.map((file) => (
-                          <div
-                            key={file.id}
-                            className={`flex items-center justify-between p-3 ${themeStyles.border} border rounded-lg`}
-                          >
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              <span className="text-2xl">
-                                {getFileIcon(file.type)}
-                              </span>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium truncate">{file.name}</p>
-                                <p className={`text-xs ${themeStyles.secondaryText}`}>
-                                  {formatFileSize(file.size)} • Uploaded {formatDate(file.uploadedAt)}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => downloadFile(file)}
-                                className="p-2 text-blue-500 hover:bg-blue-100 rounded-lg transition-colors"
-                                title="Download"
-                              >
-                                📥
-                              </button>
-                              <button
-                                onClick={() => removeRequirementAttachment(file.id)}
-                                className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors"
-                                title="Remove"
-                              >
-                                🗑️
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex gap-3 pt-4 border-t">
-                    <button
-                      onClick={saveRequirement}
-                      disabled={isLoading}
-                      className={`px-6 py-3 rounded-lg text-white ${themeStyles.buttonSuccess} transition-colors flex items-center gap-2 flex-1 justify-center font-medium disabled:opacity-60`}
-                    >
-                      <span>💾</span>
-                      {isLoading ? "Saving…" : editingRequirement ? "Update Requirement" : "Save Requirement"}
-                    </button>
-                    <button
-                      onClick={() => {
-                        resetRequirementForm();
-                        setActivePage("clients");
-                      }}
-                      disabled={isLoading}
-                      className={`px-6 py-3 rounded-lg text-white ${themeStyles.buttonSecondary} transition-colors flex items-center gap-2 justify-center font-medium disabled:opacity-60`}
-                    >
-                      <span>❌</span> Cancel
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Requirements List Table */}
-              <div className={`${themeStyles.card} p-6 rounded-lg shadow-lg mt-6`}>
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-bold">All Requirements</h3>
-                  <div className="flex gap-3">
-                    <input
-                      type="text"
-                      placeholder="Search requirements..."
-                      value={requirementSearchTerm}
-                      onChange={(e) => setRequirementSearchTerm(e.target.value)}
-                      className={`${themeStyles.input} border p-2 rounded-lg w-64`}
-                    />
-                  </div>
-                </div>
-
-                {filteredRequirements.length === 0 ? (
-                  <div className="text-center py-8">
-                    <span className="text-6xl mb-4 block opacity-50">📋</span>
-                    <p className={`text-lg ${themeStyles.secondaryText}`}>No requirements found</p>
-                    <p className={`text-sm ${themeStyles.secondaryText} mt-2`}>
-                      Add requirements using the form above
-                    </p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className={themeStyles.tableHeader}>
-                          <th className="p-3 text-left">S.No</th>
-                          <th className="p-3 text-left">Client Name</th>
-                          <th className="p-3 text-left">Received Date</th>
-                          <th className="p-3 text-left">Agent</th>
-                          <th className="p-3 text-left">Process</th>
-                          <th className="p-3 text-left">Designation</th>
-                          <th className="p-3 text-left">Type</th>
-                          <th className="p-3 text-left">No. of Req</th>
-                          <th className="p-3 text-left">Drive Date</th>
-                          <th className="p-3 text-left">Deadline</th>
-                          <th className="p-3 text-left">Budget</th>
-                          <th className="p-3 text-left">Payout (₹)</th>
-                          <th className="p-3 text-left">Payout (%)</th>
-                          <th className="p-3 text-left">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredRequirements.map((req, index) => (
-                          <tr key={req._id || req.id} className={`border-b ${themeStyles.border} ${themeStyles.tableRow}`}>
-                            <td className="p-3 text-sm">{index + 1}</td>
-                            <td className="p-3 font-medium">{req.clientName}</td>
-                            <td className="p-3">{formatDateOnly(req.requirementReceivedDate)}</td>
-                            <td className="p-3">{req.agent}</td>
-                            <td className="p-3">{req.process}</td>
-                            <td className="p-3">{req.designationPosition}</td>
-                            <td className="p-3">
-                              <span className={`px-2 py-1 rounded-full text-xs ${
-                                req.requirementType === 'Bonanza' ? 'bg-purple-100 text-purple-800' :
-                                req.requirementType === 'Regular' ? 'bg-green-100 text-green-800' :
-                                'bg-orange-100 text-orange-800'
-                              }`}>
-                                {req.requirementType}
-                              </span>
-                            </td>
-                            <td className="p-3 text-center">{req.noOfRequirement}</td>
-                            <td className="p-3">{formatDateOnly(req.driveDate)}</td>
-                            <td className="p-3">{formatDateOnly(req.requirementDeadline)}</td>
-                            <td className="p-3">{req.budget}</td>
-                            <td className="p-3">{req.payoutCommissionRs || '-'}</td>
-                            <td className="p-3">{req.payoutCommissionPercent ? `${req.payoutCommissionPercent}%` : '-'}</td>
-                            <td className="p-3">
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={() => editRequirement(req)}
-                                  className="p-2 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                                  title="Edit Requirement"
-                                >
-                                  ✏️
-                                </button>
-                                <button
-                                  onClick={() => deleteRequirementHandler(req._id || req.id)}
-                                  className="p-2 text-red-600 hover:bg-red-100 rounded transition-colors"
-                                  title="Delete Requirement"
-                                >
-                                  🗑️
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
             </div>
           )}
         </div>

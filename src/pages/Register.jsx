@@ -221,7 +221,7 @@ const Register = () => {
           />
          
           <div className="flex justify-between items-center mt-6">
-           <img src={logo} alt="" className="h-8 w-auto opacity-50" />
+          <img src={logo} alt="" className="h-8 w-auto opacity-50" />
             <button
               type="submit"
               className="bg-[#4caf50] hover:bg-green-600 transition text-white px-8 py-3 rounded-md font-semibold shadow-lg"

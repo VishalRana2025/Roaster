@@ -10,7 +10,10 @@ const clientSchema = new mongoose.Schema({
   startDate: String,
   paymentTerms: String,
   attachments: Array,
-  createdBy: String
-}, { timestamps: true });
+  createdBy: String,
+  createdByEmail: String,
+  createdByName: String,
+  createdByEmployeeId: String
+}, { timestamps: true }); // 🔥 IMPORTANT
 
 module.exports = mongoose.model("Client", clientSchema);
