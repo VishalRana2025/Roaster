@@ -5,7 +5,7 @@ const clientSchema = new mongoose.Schema({
   clientPocName: String,
   clientPocEmail: String,
   clientPocMobile: String,
-  clientVanderEmail: String,
+  clientVandorEmail: String,
   ourPocName: String,
   startDate: String,
   paymentTerms: String,
