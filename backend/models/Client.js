@@ -5,7 +5,7 @@ const clientSchema = new mongoose.Schema({
   clientPocName: String,
   clientPocEmail: String,
   clientPocMobile: String,
-  clientVandorEmail: String,
+ clientVendorEmail: String,
   ourPocName: String,
   startDate: String,
   paymentTerms: String,
@@ -14,6 +14,6 @@ const clientSchema = new mongoose.Schema({
   createdByEmail: String,
   createdByName: String,
   createdByEmployeeId: String
-}, { timestamps: true }); // 🔥 IMPORTANT
+}, { timestamps: true });
 
 module.exports = mongoose.model("Client", clientSchema);
